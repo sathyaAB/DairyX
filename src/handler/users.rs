@@ -1,177 +1,73 @@
+use axum::{
+    extract::{Path, Query, Extension},
+    Json,
+};
 use std::sync::Arc;
-
-use axum::{extract::Query, middleware, response::IntoResponse, routing::{get, put}, Extension, Json, Router};
-use validator::Validate;
-
-use crate::{db::UserExt, dtos::{FilterUserDto, NameUpdateDto, RequestQueryDto, Response, RoleUpdateDto, UserData, UserListResponseDto, UserPasswordUpdateDto, UserResponseDto}, error::{ErrorMessage, HttpError}, middleware::{role_check, JWTAuthMiddeware}, models::UserRole, utils::password, AppState};
+use crate::dtos::{FilterUserDto, UserListResponseDto, RequestQueryDto};
+use crate::error::HttpError;
+use crate::db::DBClient;
+use crate::AppState;
+use axum::routing::get;
+use axum::Router;
+use crate::db::UserExt; 
 
 
 pub fn users_handler() -> Router {
     Router::new()
-        .route(
-            "/me", 
-            get(get_me)
-            .layer(middleware::from_fn(|state, req, next| {
-                role_check(state, req, next, vec![UserRole::Admin, UserRole::User])
-            }))
-    )
-    .route(
-        "/users", 
-        get(get_users)
-        .layer(middleware::from_fn(|state, req, next| {
-            role_check(state, req, next, vec![UserRole::Admin])
-        }))
-    )
-    .route("/name", put(update_user_name))
-    .route("/role", put(update_user_role))
-    .route("/password", put(update_user_password))
+        // Get a single user by ID
+        .route("/:id", get(get_user))
+        
+        // Get list of users (with pagination query params)
+        .route("/", get(get_users))
+        
+        // // Update user first & last name
+        // .route("/:id/name", put(update_user_name))
+        
+        // // Update user role
+        // .route("/:id/role", put(update_user_role))
+        
+        // // Update user password
+        // .route("/:id/password", put(update_user_password))
 }
 
 
+pub async fn get_user(
+    Extension(app_state): Extension<Arc<AppState>>,
+    Path(user_id): Path<String>,
+) -> Result<Json<FilterUserDto>, HttpError> {
+    let user_uuid = uuid::Uuid::parse_str(&user_id)
+        .map_err(|_| HttpError::bad_request("Invalid user ID".to_string()))?;
 
-pub async fn get_me(
-    Extension(_app_state): Extension<Arc<AppState>>,
-    Extension(user): Extension<JWTAuthMiddeware>
-) -> Result<impl IntoResponse, HttpError> {
+    let user = app_state.db_client
+        .get_user(Some(user_uuid), None, None)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?
+        .ok_or(HttpError::bad_request("User not found".to_string()))?;
 
-    let filtered_user = FilterUserDto::filter_user(&user.user);
-
-    let response_data = UserResponseDto {
-        status: "success".to_string(),
-        data: UserData {
-            user: filtered_user,
-        }
-    };
-
-    Ok(Json(response_data))
+    Ok(Json(FilterUserDto::filter_user(&user)))
 }
 
+// Get list of users with pagination
 pub async fn get_users(
-    Query(query_params): Query<RequestQueryDto>,
-    Extension(app_state): Extension<Arc<AppState>>
-) -> Result<impl IntoResponse, HttpError> {
-    query_params.validate()
-        .map_err(|e| HttpError::bad_request(e.to_string()))?;
+    Extension(app_state): Extension<Arc<AppState>>,
+    Query(params): Query<RequestQueryDto>,
+) -> Result<Json<UserListResponseDto>, HttpError> {
+    let page = params.page.unwrap_or(1) as u32;
+    let limit = params.limit.unwrap_or(20) as u32;
 
-    let page = query_params.page.unwrap_or(1);
-    let limit = query_params.limit.unwrap_or(10);
-    
     let users = app_state.db_client
-        .get_users(page as u32, limit)
+        .get_users(page , limit as usize)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
-    let user_count = app_state.db_client
+    let total = app_state.db_client
         .get_user_count()
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
-    let response = UserListResponseDto {
+    Ok(Json(UserListResponseDto {
         status: "success".to_string(),
-        users: FilterUserDto::filter_users(&users),
-        results: user_count,
-    };
-
-    Ok(Json(response))
-}
-
-pub async fn update_user_name(
-    Extension(app_state): Extension<Arc<AppState>>,
-    Extension(user): Extension<JWTAuthMiddeware>,
-    Json(body): Json<NameUpdateDto>,
-) -> Result<impl IntoResponse, HttpError> {
-    body.validate()
-       .map_err(|e| HttpError::bad_request(e.to_string()))?;
-
-    let user = &user.user;
-
-    let user_id = uuid::Uuid::parse_str(&user.id.to_string()).unwrap();
-
-    let result = app_state.db_client.
-        update_user_name(user_id.clone(), &body.name)
-        .await
-        .map_err(|e| HttpError::server_error(e.to_string()))?;
-
-    let filtered_user = FilterUserDto::filter_user(&result);
-
-    let response = UserResponseDto {
-        data: UserData {
-            user: filtered_user,
-        },
-        status: "success".to_string(),
-    };
-
-    Ok(Json(response))
-}
-
-pub async fn update_user_role(
-    Extension(app_state): Extension<Arc<AppState>>,
-    Extension(user): Extension<JWTAuthMiddeware>,
-    Json(body): Json<RoleUpdateDto>,
-) -> Result<impl IntoResponse, HttpError> {
-    body.validate()
-        .map_err(|e| HttpError::bad_request(e.to_string()))?;
-
-    let user = &user.user;
-
-    let user_id = uuid::Uuid::parse_str(&user.id.to_string()).unwrap();
-
-    let result = app_state.db_client
-        .update_user_role(user_id.clone(), body.role)
-        .await
-        .map_err(|e| HttpError::server_error(e.to_string()))?;
-
-    let filtered_user = FilterUserDto::filter_user(&result);
-
-    let response = UserResponseDto {
-        data: UserData {
-            user: filtered_user,
-        },
-        status: "success".to_string(),
-    };
-
-    Ok(Json(response))
-}
-
-pub async fn update_user_password(
-    Extension(app_state): Extension<Arc<AppState>>,
-    Extension(user): Extension<JWTAuthMiddeware>,
-    Json(body): Json<UserPasswordUpdateDto>,
-) -> Result<impl IntoResponse, HttpError> {
-    body.validate()
-       .map_err(|e| HttpError::bad_request(e.to_string()))?;
-
-    let user = &user.user;
-
-    let user_id = uuid::Uuid::parse_str(&user.id.to_string()).unwrap();
-
-    let result = app_state.db_client
-        .get_user(Some(user_id.clone()), None, None, None)
-        .await
-        .map_err(|e| HttpError::server_error(e.to_string()))?;
-
-    let user = result.ok_or(HttpError::unauthorized(ErrorMessage::InvalidToken.to_string()))?;
-
-    let password_match = password::compare(&body.old_password, &user.password)
-            .map_err(|e| HttpError::server_error(e.to_string()))?;
-
-    if !password_match {
-        return Err(HttpError::bad_request("Old password is incorrect".to_string()));
-    }
-
-    let hash_password = password::hash(&body.new_password)
-        .map_err(|e| HttpError::server_error(e.to_string()))?;
-
-    app_state.db_client
-        .update_user_password(user_id.clone(), hash_password)
-        .await
-        .map_err(|e| HttpError::server_error(e.to_string()))?;
-
-    let response = Response {
-        message: "Password updated Successfully".to_string(),
-        status: "success",
-    };
-
-    Ok(Json(response))
-
+        users: users.iter().map(|u| FilterUserDto::filter_user(u)).collect(),
+        results: total,
+    }))
 }

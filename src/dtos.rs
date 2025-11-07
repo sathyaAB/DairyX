@@ -5,28 +5,28 @@ use validator::Validate;
 
 use crate::models::{User, UserRole};
 
+
+
 #[derive(Validate, Debug, Default, Clone, Serialize, Deserialize)]
 pub struct RegisterUserDto {
-    #[validate(length(min = 1, message = "Name is required"))]
-    pub name: String,
-    #[validate(
-        length(min = 1, message = "Email is required"),
-        email(message = "Email is invalid")
-    )]
+    #[validate(length(min = 1, message = "First name is required"))]
+    pub first_name: String,
+    #[validate(length(min = 1, message = "Last name is required"))]
+    pub last_name: String,
+    #[validate(length(min = 1, message = "Email is required"), email(message = "Email is invalid"))]
     pub email: String,
-    #[validate(
-        length(min = 1, message = "Password is required"),
-        length(min = 6, message = "Password must be at least 6 characters")
-    )]
+    #[validate(length(min = 6, message = "Password must be at least 6 characters"))]
     pub password: String,
-
-    #[validate(
-        length(min = 1, message = "Confirm Password is required"),
-        must_match(other = "password", message="passwords do not match")
-    )]
+    #[validate(must_match(other = "password", message = "Passwords do not match"))]
     #[serde(rename = "passwordConfirm")]
     pub password_confirm: String,
+    pub address: Option<String>,
+    pub city: Option<String>,
+    pub district: Option<String>,
+    pub contact_number: Option<String>,
+    pub role: Option<UserRole>, 
 }
+
 
 #[derive(Validate, Debug, Default, Clone, Serialize, Deserialize)]
 pub struct LoginUserDto {
@@ -50,10 +50,14 @@ pub struct RequestQueryDto {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FilterUserDto {
     pub id: String,
-    pub name: String,
+    pub first_name: String,
+    pub last_name: String,
     pub email: String,
     pub role: String,
-    pub verified: bool,
+    pub address: Option<String>,
+    pub city: Option<String>,
+    pub district: Option<String>,
+    pub contact_number: Option<String>,
     #[serde(rename = "createdAt")]
     pub created_at: DateTime<Utc>,
     #[serde(rename = "updatedAt")]
@@ -64,19 +68,20 @@ impl FilterUserDto {
     pub fn filter_user(user: &User) -> Self {
         FilterUserDto {
             id: user.id.to_string(),
-            name: user.name.to_owned(),
+            first_name: user.first_name.to_owned(),
+            last_name: user.last_name.to_owned(),
             email: user.email.to_owned(),
-            verified: user.verified,
             role: user.role.to_str().to_string(),
+            address: user.address.clone(),
+            city: user.city.clone(),
+            district: user.district.clone(),
+            contact_number: user.contact_number.clone(),
             created_at: user.created_at.unwrap(),
             updated_at: user.updated_at.unwrap(),
         }
     }
-
-    pub fn filter_users(user: &[User]) -> Vec<FilterUserDto> {
-        user.iter().map(FilterUserDto::filter_user).collect()
-    }
 }
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UserData {
@@ -110,8 +115,10 @@ pub struct Response {
 
 #[derive(Validate, Debug, Default, Clone, Serialize, Deserialize)]
 pub struct NameUpdateDto {
-    #[validate(length(min = 1, message = "Name is required"))]
-    pub name: String,
+    #[validate(length(min = 1, message = "First name is required"))]
+    pub first_name: String,
+    #[validate(length(min = 1, message = "Last name is required"))]
+    pub last_name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
@@ -122,10 +129,10 @@ pub struct RoleUpdateDto {
 
 fn validate_user_role(role: &UserRole) -> Result<(), validator::ValidationError> {
     match role {
-        UserRole::Admin | UserRole::User => Ok(()),
-        _ => Err(validator::ValidationError::new("invalid_role")),
+        UserRole::Admin | UserRole::Manager | UserRole::Driver => Ok(()),
     }
 }
+
 
 #[derive(Debug, Validate, Default, Clone, Serialize, Deserialize)]
 pub struct UserPasswordUpdateDto {
