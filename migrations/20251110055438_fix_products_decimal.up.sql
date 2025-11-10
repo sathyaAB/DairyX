@@ -1,0 +1,4 @@
+-- Add up migration script here
+ALTER TABLE products
+    ALTER COLUMN price TYPE DOUBLE PRECISION USING price::DOUBLE PRECISION,
+    ALTER COLUMN commission TYPE DOUBLE PRECISION USING commission::DOUBLE PRECISION;

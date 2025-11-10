@@ -7,7 +7,7 @@ use validator::Validate;
 use crate::models::UserRole;
 
 
-use crate::{db::UserExt, dtos::{ForgotPasswordRequestDto, LoginUserDto, RegisterUserDto, ResetPasswordRequestDto, Response, UserLoginResponseDto, VerifyEmailQueryDto}, error::{ErrorMessage, HttpError}, mail::mails::{send_forgot_password_email, send_verification_email, send_welcome_email}, utils::{password, token}, AppState};
+use crate::{db::UserExt, dtos::{LoginUserDto, RegisterUserDto, Response, UserLoginResponseDto}, error::{ErrorMessage, HttpError}, mail::mails::{send_forgot_password_email, send_verification_email, send_welcome_email}, utils::{password, token}, AppState};
 
 pub fn auth_handler() -> Router {
     Router::new()
@@ -94,7 +94,7 @@ pub async fn login(
     // Generate JWT token
     let secret_key = app_state.env.jwt_secret.as_bytes();
 
-    let token = token::create_token(&user.id.to_string(), secret_key,3600)
+    let token = token::create_token(&user.id.to_string(), &user.role.to_str(),secret_key,3600)
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
     println!("User '{}' logged in successfully", user.email);

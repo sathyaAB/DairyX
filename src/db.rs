@@ -3,10 +3,7 @@ use chrono::{DateTime, Utc};
 use sqlx::{Pool, Postgres, Row, PgPool};
 use uuid::Uuid;
 
-use crate::models::{User, UserRole};
-
-
-
+use crate::models::{User, UserRole, Product};
 
 #[derive(Debug, Clone)]
 pub struct DBClient {
@@ -54,24 +51,7 @@ pub trait UserExt {
 
     async fn get_user_count(&self) -> Result<i64, sqlx::Error>;
 
-    async fn update_user_name(
-        &self,
-        user_id: Uuid,
-        first_name: &str,
-        last_name: &str,
-    ) -> Result<User, sqlx::Error>;
-
-    async fn update_user_role(
-        &self,
-        user_id: Uuid,
-        role: UserRole,
-    ) -> Result<User, sqlx::Error>;
-
-    async fn update_user_password(
-        &self,
-        user_id: Uuid,
-        new_password: &str,
-    ) -> Result<User, sqlx::Error>;
+    
 }
 
 #[async_trait]
@@ -215,74 +195,58 @@ impl UserExt for DBClient {
         Ok(count.unwrap_or(0))
     }
 
-    async fn update_user_name(
+   
+}
+
+#[async_trait]
+pub trait ProductExt {
+    async fn create_product(
         &self,
-        user_id: Uuid,
-        first_name: &str,
-        last_name: &str,
-    ) -> Result<User, sqlx::Error> {
-        let user = sqlx::query_as!(
-            User,
-            r#"
-            UPDATE users
-            SET first_name = $1, last_name = $2, updated_at = NOW()
-            WHERE id = $3
-            RETURNING id, first_name, last_name, email, password, role as "role: UserRole",
-                      address, city, district, contact_number, created_at, updated_at
-            "#,
-            first_name,
-            last_name,
-            user_id
+        name: &str,
+        price: f64,
+        unit_type: &str,
+        commission: Option<f64>,
+    ) -> Result<Product, sqlx::Error>;
+
+    async fn get_product_by_id(&self, product_id: Uuid) -> Result<Option<Product>, sqlx::Error>;
+    async fn get_all_products(&self) -> Result<Vec<Product>, sqlx::Error>;
+}
+
+#[async_trait]
+impl ProductExt for DBClient {
+    async fn create_product(
+        &self,
+        name: &str,
+        price: f64,
+        unit_type: &str,
+        commission: Option<f64>,
+    ) -> Result<Product, sqlx::Error> {
+        let product = sqlx::query_as::<_, Product>(
+            "INSERT INTO products (name, price, unit_type, commission, created_at, updated_at)
+             VALUES ($1,$2,$3,$4,NOW(),NOW()) RETURNING *"
         )
+        .bind(name)
+        .bind(price)
+        .bind(unit_type)
+        .bind(commission.unwrap_or(0.0))
         .fetch_one(&self.pool)
         .await?;
-
-        Ok(user)
+        Ok(product)
     }
 
-    async fn update_user_role(
-        &self,
-        user_id: Uuid,
-        new_role: UserRole
-    ) -> Result<User, sqlx::Error> {
-        let user = sqlx::query_as!(
-            User,
-            r#"
-            UPDATE users
-            SET role = $1, updated_at = NOW()
-            WHERE id = $2
-            RETURNING id, first_name, last_name, email, password, role as "role: UserRole",
-                      address, city, district, contact_number, created_at, updated_at
-            "#,
-            new_role as UserRole,
-            user_id
-        )
-        .fetch_one(&self.pool)
+    async fn get_product_by_id(&self, product_id: Uuid) -> Result<Option<Product>, sqlx::Error> {
+        let product = sqlx::query_as::<_, Product>("SELECT * FROM products WHERE id = $1")
+            .bind(product_id)
+            .fetch_optional(&self.pool)
+            .await?;
+        Ok(product)
+    }
+
+    async fn get_all_products(&self) -> Result<Vec<Product>, sqlx::Error> {
+    let products = sqlx::query_as::<_, Product>("SELECT * FROM products")
+        .fetch_all(&self.pool)
         .await?;
+    Ok(products)
+}
 
-        Ok(user)
-    }
-
-    async fn update_user_password(
-        &self,
-        user_id: Uuid,
-        new_password: &str
-    ) -> Result<User, sqlx::Error> {
-        let user = sqlx::query_as!(
-            User,
-            r#"
-            UPDATE users
-            SET password = $1, updated_at = NOW()
-            WHERE id = $2
-            RETURNING id, first_name, last_name, email, password, role as "role: UserRole",
-                      address, city, district, contact_number, created_at, updated_at
-            "#,
-            new_password,
-            user_id
-        )
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(user)
-    }
 }

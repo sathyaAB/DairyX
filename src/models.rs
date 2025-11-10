@@ -36,3 +36,16 @@ pub struct User {
     #[serde(rename = "updatedAt")]
     pub updated_at: Option<DateTime<Utc>>,
 }
+
+#[derive(Debug, Deserialize, Serialize, sqlx::FromRow, Clone)]
+pub struct Product {
+    pub id: uuid::Uuid,
+    pub name: String,
+    pub price: f64,
+    pub unit_type: String,
+    pub commission: f64,
+    #[serde(rename = "createdAt")]
+    pub created_at: Option<DateTime<Utc>>,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: Option<DateTime<Utc>>,
+}
