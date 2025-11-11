@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
-use crate::models::{User, UserRole, Product};
+use crate::models::{User, UserRole, Product, Delivery};
 
 
 
@@ -132,4 +132,28 @@ pub struct ProductsListResponseDto {
     pub status: String,
     pub results: usize,
     pub products: Vec<Product>,
+}
+
+#[derive(Debug, Deserialize)] 
+pub struct CreateDeliveryDto {
+    pub date: String, // or chrono::NaiveDate
+    pub products: Vec<DeliveryProductDto>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DeliveryProductDto {
+    pub product_id: uuid::Uuid,
+    pub quantity: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DeliveryResponseDto {
+    pub status: String,
+    pub delivery: Delivery,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DeliveriesListResponseDto {
+    pub status: String,
+    pub deliveries: Vec<Delivery>,
 }

@@ -1,9 +1,11 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
-use sqlx::{Pool, Postgres, Row, PgPool};
+use chrono::{DateTime, Utc, NaiveDate};
+use sqlx::{Pool, Postgres, Row, PgPool, Error, Transaction, Executor};
 use uuid::Uuid;
 
 use crate::models::{User, UserRole, Product};
+
+use crate::models::{Delivery, DeliveryProduct, WarehouseStock};
 
 #[derive(Debug, Clone)]
 pub struct DBClient {
@@ -248,5 +250,90 @@ impl ProductExt for DBClient {
         .await?;
     Ok(products)
 }
+
+}
+
+
+#[async_trait]
+pub trait DeliveryExt {
+    async fn create_delivery(
+        &self,
+        user_id: Uuid,
+        date: NaiveDate,
+        products: Vec<(Uuid, i32)>, // (product_id, quantity)
+    ) -> Result<Delivery, sqlx::Error>;
+
+}
+#[async_trait]
+impl DeliveryExt for DBClient {
+    async fn create_delivery(
+    &self,
+    user_id: Uuid,
+    date: NaiveDate,
+    products: Vec<(Uuid, i32)>,
+) -> Result<Delivery, sqlx::Error> {
+    let mut tx: Transaction<'_, Postgres> = self.pool.begin().await?;
+
+    // Insert into deliveries
+    let delivery = sqlx::query_as::<_, Delivery>(
+        "INSERT INTO deliveries (date, userid)
+         VALUES ($1, $2)
+         RETURNING *"
+    )
+    .bind(date)
+    .bind(user_id)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    // Insert into delivery_product and update warehouse_stock
+    for (product_id, quantity) in &products {
+        // Insert into delivery_product
+        sqlx::query(
+            "INSERT INTO delivery_product (deliveryid, productid, quantity)
+             VALUES ($1, $2, $3)"
+        )
+        .bind(delivery.deliveryid)
+        .bind(product_id)
+        .bind(quantity)
+        .execute(&mut *tx)
+        .await?;
+
+        // Check if product exists in warehouse_stock
+        let exists = sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(SELECT 1 FROM warehouse_stock WHERE productid = $1)"
+        )
+        .bind(product_id)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        if exists {
+            // Update existing stock
+            sqlx::query(
+                "UPDATE warehouse_stock 
+                 SET quantity = quantity + $2 
+                 WHERE productid = $1"
+            )
+            .bind(product_id)
+            .bind(quantity)
+            .execute(&mut *tx)
+            .await?;
+        } else {
+            // Insert new stock entry
+            sqlx::query(
+                "INSERT INTO warehouse_stock (productid, quantity)
+                 VALUES ($1, $2)"
+            )
+            .bind(product_id)
+            .bind(quantity)
+            .execute(&mut *tx)
+            .await?;
+        }
+    }
+
+    tx.commit().await?;
+
+    Ok(delivery)
+}
+
 
 }

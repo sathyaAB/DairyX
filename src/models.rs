@@ -1,5 +1,7 @@
 use chrono::prelude::*;
 use serde::{Deserialize, Serialize};
+use chrono::NaiveDate;
+
 
 #[derive(Debug, Deserialize, Serialize, Clone, Copy, sqlx::Type, PartialEq)]
 #[sqlx(type_name = "user_role", rename_all = "lowercase")]
@@ -49,3 +51,27 @@ pub struct Product {
     #[serde(rename = "updatedAt")]
     pub updated_at: Option<DateTime<Utc>>,
 }
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
+pub struct Delivery {
+    pub deliveryid: uuid::Uuid,
+    pub date: NaiveDate,
+    pub userid: uuid::Uuid,
+}
+
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
+pub struct DeliveryProduct {
+    pub deliveryid: uuid::Uuid,
+    pub productid: uuid::Uuid,
+    pub quantity: i32,
+}
+
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
+pub struct WarehouseStock {
+    pub stockid: uuid::Uuid,
+    pub productid: uuid::Uuid,
+    pub quantity: i32,
+}
+
