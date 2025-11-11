@@ -157,3 +157,9 @@ pub struct DeliveriesListResponseDto {
     pub status: String,
     pub deliveries: Vec<Delivery>,
 }
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DeliveryListResponseDto {
+    pub status: String,
+    pub deliveries: Vec<Delivery>,
+}
+

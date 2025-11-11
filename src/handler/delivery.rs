@@ -4,7 +4,7 @@ use axum::{
     Json,
 };
 use std::sync::Arc;
-use crate::dtos::{CreateDeliveryDto, DeliveryResponseDto};
+use crate::dtos::{CreateDeliveryDto, DeliveryResponseDto, DeliveryListResponseDto};
 use crate::error::{HttpError, ErrorMessage};
 use crate::db::{DBClient, DeliveryExt};
 use crate::models::UserRole;
@@ -17,6 +17,7 @@ use uuid::Uuid;
 pub fn delivery_handler() -> Router { 
     Router::new()
         .route("/create", post(create_delivery))
+        .route("/history", get(get_delivery_history))
 }
 
 pub async fn create_delivery(
@@ -55,5 +56,23 @@ pub async fn create_delivery(
     Ok(Json(DeliveryResponseDto {
         status: "success".to_string(),
         delivery,
+    }))
+}
+
+pub async fn get_delivery_history(
+    Extension(jwt_auth): Extension<JWTAuthMiddeware>,
+    Extension(app_state): Extension<Arc<AppState>>,
+) -> Result<Json<DeliveryListResponseDto>, HttpError> {
+    let user_id = jwt_auth.user.id;
+
+    // Fetch all deliveries for the logged-in user
+    let deliveries = app_state.db_client
+        .get_deliveries_by_user(user_id)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    Ok(Json(DeliveryListResponseDto {
+        status: "success".to_string(),
+        deliveries,
     }))
 }

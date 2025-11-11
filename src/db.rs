@@ -263,6 +263,8 @@ pub trait DeliveryExt {
         products: Vec<(Uuid, i32)>, // (product_id, quantity)
     ) -> Result<Delivery, sqlx::Error>;
 
+    async fn get_deliveries_by_user(&self, user_id: Uuid) -> Result<Vec<Delivery>, sqlx::Error>;
+
 }
 #[async_trait]
 impl DeliveryExt for DBClient {
@@ -335,5 +337,15 @@ impl DeliveryExt for DBClient {
     Ok(delivery)
 }
 
+
+    async fn get_deliveries_by_user(&self, user_id: Uuid) -> Result<Vec<Delivery>, sqlx::Error> {
+    let deliveries = sqlx::query_as::<_, Delivery>(
+        "SELECT * FROM deliveries WHERE userid = $1 ORDER BY date DESC"
+    )
+    .bind(user_id)
+    .fetch_all(&self.pool)
+    .await?;
+    Ok(deliveries)
+}
 
 }
