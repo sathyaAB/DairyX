@@ -63,7 +63,7 @@ pub async fn auth(
                 HttpError::unauthorized(ErrorMessage::InvalidToken.to_string())
             })?;
 
-    let user = app_state.db_client.get_user(Some(user_id), None, None, None)
+    let user = app_state.db_client.get_user(Some(user_id), None, None)
             .await
             .map_err(|_| {
                 HttpError::unauthorized(ErrorMessage::UserNoLongerExist.to_string())

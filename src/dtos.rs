@@ -3,30 +3,30 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
-use crate::models::{User, UserRole};
+use crate::models::{User, UserRole, Product, Delivery};
+
+
 
 #[derive(Validate, Debug, Default, Clone, Serialize, Deserialize)]
 pub struct RegisterUserDto {
-    #[validate(length(min = 1, message = "Name is required"))]
-    pub name: String,
-    #[validate(
-        length(min = 1, message = "Email is required"),
-        email(message = "Email is invalid")
-    )]
+    #[validate(length(min = 1, message = "First name is required"))]
+    pub first_name: String,
+    #[validate(length(min = 1, message = "Last name is required"))]
+    pub last_name: String,
+    #[validate(length(min = 1, message = "Email is required"), email(message = "Email is invalid"))]
     pub email: String,
-    #[validate(
-        length(min = 1, message = "Password is required"),
-        length(min = 6, message = "Password must be at least 6 characters")
-    )]
+    #[validate(length(min = 6, message = "Password must be at least 6 characters"))]
     pub password: String,
-
-    #[validate(
-        length(min = 1, message = "Confirm Password is required"),
-        must_match(other = "password", message="passwords do not match")
-    )]
+    #[validate(must_match(other = "password", message = "Passwords do not match"))]
     #[serde(rename = "passwordConfirm")]
     pub password_confirm: String,
+    pub address: Option<String>,
+    pub city: Option<String>,
+    pub district: Option<String>,
+    pub contact_number: Option<String>,
+    pub role: Option<UserRole>, 
 }
+
 
 #[derive(Validate, Debug, Default, Clone, Serialize, Deserialize)]
 pub struct LoginUserDto {
@@ -50,10 +50,14 @@ pub struct RequestQueryDto {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FilterUserDto {
     pub id: String,
-    pub name: String,
+    pub first_name: String,
+    pub last_name: String,
     pub email: String,
     pub role: String,
-    pub verified: bool,
+    pub address: Option<String>,
+    pub city: Option<String>,
+    pub district: Option<String>,
+    pub contact_number: Option<String>,
     #[serde(rename = "createdAt")]
     pub created_at: DateTime<Utc>,
     #[serde(rename = "updatedAt")]
@@ -64,19 +68,20 @@ impl FilterUserDto {
     pub fn filter_user(user: &User) -> Self {
         FilterUserDto {
             id: user.id.to_string(),
-            name: user.name.to_owned(),
+            first_name: user.first_name.to_owned(),
+            last_name: user.last_name.to_owned(),
             email: user.email.to_owned(),
-            verified: user.verified,
             role: user.role.to_str().to_string(),
+            address: user.address.clone(),
+            city: user.city.clone(),
+            district: user.district.clone(),
+            contact_number: user.contact_number.clone(),
             created_at: user.created_at.unwrap(),
             updated_at: user.updated_at.unwrap(),
         }
     }
-
-    pub fn filter_users(user: &[User]) -> Vec<FilterUserDto> {
-        user.iter().map(FilterUserDto::filter_user).collect()
-    }
 }
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UserData {
@@ -108,74 +113,53 @@ pub struct Response {
     pub message: String,
 }
 
-#[derive(Validate, Debug, Default, Clone, Serialize, Deserialize)]
-pub struct NameUpdateDto {
-    #[validate(length(min = 1, message = "Name is required"))]
+#[derive(Debug, serde::Deserialize)]
+pub struct CreateProductDto {
     pub name: String,
+    pub price: f64,
+    pub unit_type: String,
+    pub commission: Option<f64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
-pub struct RoleUpdateDto {
-    #[validate(custom = "validate_user_role")]
-    pub role: UserRole,
+#[derive(Debug, serde::Serialize)]
+pub struct ProductResponseDto {
+    pub status: String,
+    pub product: Product,
 }
 
-fn validate_user_role(role: &UserRole) -> Result<(), validator::ValidationError> {
-    match role {
-        UserRole::Admin | UserRole::User => Ok(()),
-        _ => Err(validator::ValidationError::new("invalid_role")),
-    }
+#[derive(Serialize)]
+pub struct ProductsListResponseDto {
+    pub status: String,
+    pub results: usize,
+    pub products: Vec<Product>,
 }
 
-#[derive(Debug, Validate, Default, Clone, Serialize, Deserialize)]
-pub struct UserPasswordUpdateDto {
-    #[validate(
-        length(min = 1, message = "New password is required."),
-        length(min = 6, message = "new password must be at least 6 characters")
-    )]
-    pub new_password: String,
-
-    #[validate(
-        length(min = 1, message = "New password confirm is required."),
-        length(min = 6, message = "new password confirm must be at least 6 characters"),
-        must_match(other = "new_password", message="new passwords do not match")
-    )]
-    pub new_password_confirm: String,
-
-    #[validate(
-        length(min = 1, message = "Old password is required."),
-        length(min = 6, message = "Old password must be at least 6 characters")
-    )]
-    pub old_password: String,
+#[derive(Debug, Deserialize)] 
+pub struct CreateDeliveryDto {
+    pub date: String, // or chrono::NaiveDate
+    pub products: Vec<DeliveryProductDto>,
 }
 
-#[derive(Serialize, Deserialize, Validate)]
-pub struct VerifyEmailQueryDto {
-    #[validate(length(min = 1, message = "Token is required."),)]
-    pub token: String,
+#[derive(Debug, Deserialize)]
+pub struct DeliveryProductDto {
+    pub product_id: uuid::Uuid,
+    pub quantity: i32,
 }
 
-#[derive(Deserialize, Serialize, Validate, Debug, Clone)]
-pub struct ForgotPasswordRequestDto {
-    #[validate(length(min = 1, message = "Email is required"), email(message = "Email is invalid"))]
-    pub email: String,
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DeliveryResponseDto {
+    pub status: String,
+    pub delivery: Delivery,
 }
 
-#[derive(Debug, Serialize, Deserialize, Validate, Clone)]
-pub struct ResetPasswordRequestDto {
-    #[validate(length(min = 1, message = "Token is required."),)]
-    pub token: String,
-
-    #[validate(
-        length(min = 1, message = "New password is required."),
-        length(min = 6, message = "new password must be at least 6 characters")
-    )]
-    pub new_password: String,
-
-    #[validate(
-        length(min = 1, message = "New password confirm is required."),
-        length(min = 6, message = "new password confirm must be at least 6 characters"),
-        must_match(other = "new_password", message="new passwords do not match")
-    )]
-    pub new_password_confirm: String,
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DeliveriesListResponseDto {
+    pub status: String,
+    pub deliveries: Vec<Delivery>,
 }
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DeliveryListResponseDto {
+    pub status: String,
+    pub deliveries: Vec<Delivery>,
+}
+

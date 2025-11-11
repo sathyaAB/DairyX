@@ -1,9 +1,11 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
-use sqlx::{Pool, Postgres};
+use chrono::{DateTime, Utc, NaiveDate};
+use sqlx::{Pool, Postgres, Row, PgPool, Error, Transaction, Executor};
 use uuid::Uuid;
 
-use crate::models::{User, UserRole};
+use crate::models::{User, UserRole, Product};
+
+use crate::models::{Delivery, DeliveryProduct, WarehouseStock};
 
 #[derive(Debug, Clone)]
 pub struct DBClient {
@@ -18,12 +20,16 @@ impl DBClient {
 
 #[async_trait]
 pub trait UserExt {
+    async fn get_user_by_email(
+        &self,
+        email: &str,
+    ) -> Result<Option<User>, sqlx::Error>;
+
     async fn get_user(
         &self,
         user_id: Option<Uuid>,
-        name: Option<&str>,
+        first_name: Option<&str>,
         email: Option<&str>,
-        token: Option<&str>,
     ) -> Result<Option<User>, sqlx::Error>;
 
     async fn get_users(
@@ -32,91 +38,92 @@ pub trait UserExt {
         limit: usize,
     ) -> Result<Vec<User>, sqlx::Error>;
 
-    async fn save_user<T: Into<String> + Send>(
+    async fn save_user(
         &self,
-        name: T,
-        email: T,
-        password: T,
-        verification_token: T,
-        token_expires_at: DateTime<Utc>,
+        first_name: &str,
+        last_name: &str,
+        email: &str,
+        password: &str,
+        role: UserRole,
+        address: Option<&str>,
+        city: Option<&str>,
+        district: Option<&str>,
+        contact_number: Option<&str>,
     ) -> Result<User, sqlx::Error>;
 
     async fn get_user_count(&self) -> Result<i64, sqlx::Error>;
 
-    async fn update_user_name<T: Into<String> + Send>(
-        &self,
-        user_id: Uuid,
-        name: T,
-    ) -> Result<User, sqlx::Error>;
-
-    async fn update_user_role(
-        &self,
-        user_id: Uuid,
-        role: UserRole,
-    ) -> Result<User, sqlx::Error>;
-
-    async fn update_user_password(
-        &self,
-        user_id: Uuid,
-        password: String,
-    ) -> Result<User, sqlx::Error>;
-
-    async fn verifed_token(
-        &self,
-        token: &str,
-    ) -> Result<(), sqlx::Error>;
-
-    async fn add_verifed_token(
-        &self,
-        user_id: Uuid,
-        token: &str,
-        expires_at: DateTime<Utc>,
-    ) -> Result<(), sqlx::Error>;
+    
 }
 
 #[async_trait]
 impl UserExt for DBClient {
+    
+  async fn get_user_by_email(
+        &self,
+        email: &str,
+    ) -> Result<Option<User>, sqlx::Error> {
+        let user = sqlx::query_as::<_, User>(
+            "SELECT * FROM users WHERE email = $1"
+        )
+        .bind(email)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(user)
+    }
     async fn get_user(
         &self,
         user_id: Option<Uuid>,
-        name: Option<&str>,
+        first_name: Option<&str>,
         email: Option<&str>,
-        token: Option<&str>,
     ) -> Result<Option<User>, sqlx::Error> {
-        let mut user: Option<User> = None;
-
         if let Some(user_id) = user_id {
-            user = sqlx::query_as!(
-                User,
-                r#"SELECT id, name, email, password, verified, created_at, updated_at, verification_token, token_expires_at, role as "role: UserRole" FROM users WHERE id = $1"#,
-                user_id
-            ).fetch_optional(&self.pool).await?;
-        } else if let Some(name) = name {
-            user = sqlx::query_as!(
-                User,
-                r#"SELECT id, name, email, password, verified, created_at, updated_at, verification_token, token_expires_at, role as "role: UserRole" FROM users WHERE name = $1"#,
-                name
-            ).fetch_optional(&self.pool).await?;
-        } else if let Some(email) = email {
-            user = sqlx::query_as!(
-                User,
-                r#"SELECT id, name, email, password, verified, created_at, updated_at, verification_token, token_expires_at, role as "role: UserRole" FROM users WHERE email = $1"#,
-                email
-            ).fetch_optional(&self.pool).await?;
-        } else if let Some(token) = token {
-            user = sqlx::query_as!(
+            return sqlx::query_as!(
                 User,
                 r#"
-                SELECT id, name, email, password, verified, created_at, updated_at, verification_token, token_expires_at, role as "role: UserRole" 
-                FROM users 
-                WHERE verification_token = $1"#,
-                token
+                SELECT id, first_name, last_name, email, password, role as "role: UserRole",
+                       address, city, district, contact_number, created_at, updated_at
+                FROM users
+                WHERE id = $1
+                "#,
+                user_id
             )
             .fetch_optional(&self.pool)
-            .await?;
+            .await;
         }
 
-        Ok(user)
+        if let Some(first_name) = first_name {
+            return sqlx::query_as!(
+                User,
+                r#"
+                SELECT id, first_name, last_name, email, password, role as "role: UserRole",
+                       address, city, district, contact_number, created_at, updated_at
+                FROM users
+                WHERE first_name = $1
+                "#,
+                first_name
+            )
+            .fetch_optional(&self.pool)
+            .await;
+        }
+
+        if let Some(email) = email {
+            return sqlx::query_as!(
+                User,
+                r#"
+                SELECT id, first_name, last_name, email, password, role as "role: UserRole",
+                       address, city, district, contact_number, created_at, updated_at
+                FROM users
+                WHERE email = $1
+                "#,
+                email
+            )
+            .fetch_optional(&self.pool)
+            .await;
+        }
+
+        Ok(None)
     }
 
     async fn get_users(
@@ -128,152 +135,217 @@ impl UserExt for DBClient {
 
         let users = sqlx::query_as!(
             User,
-            r#"SELECT id, name, email, password, verified, created_at, updated_at, verification_token, token_expires_at, role as "role: UserRole" FROM users 
-            ORDER BY created_at DESC LIMIT $1 OFFSET $2"#,
+            r#"
+            SELECT id, first_name, last_name, email, password, role as "role: UserRole",
+                   address, city, district, contact_number, created_at, updated_at
+            FROM users
+            ORDER BY created_at DESC
+            LIMIT $1 OFFSET $2
+            "#,
             limit as i64,
             offset as i64,
-        ).fetch_all(&self.pool)
+        )
+        .fetch_all(&self.pool)
         .await?;
 
         Ok(users)
     }
 
-    async fn save_user<T: Into<String> + Send>(
+    async fn save_user(
         &self,
-        name: T,
-        email: T,
-        password: T,
-        verification_token: T,
-        token_expires_at: DateTime<Utc>,
+        first_name: &str,
+        last_name: &str,
+        email: &str,
+        password: &str,
+        role: UserRole,
+        address: Option<&str>,
+        city: Option<&str>,
+        district: Option<&str>,
+        contact_number: Option<&str>,
     ) -> Result<User, sqlx::Error> {
         let user = sqlx::query_as!(
             User,
             r#"
-            INSERT INTO users (name, email, password,verification_token, token_expires_at) 
-            VALUES ($1, $2, $3, $4, $5) 
-            RETURNING id, name, email, password, verified, created_at, updated_at, verification_token, token_expires_at, role as "role: UserRole"
+            INSERT INTO users (
+                first_name, last_name, email, password, role, address, city, district, contact_number
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            RETURNING
+                id, first_name, last_name, email, password, role as "role: UserRole",
+                address, city, district, contact_number, created_at, updated_at
             "#,
-            name.into(),
-            email.into(),
-            password.into(),
-            verification_token.into(),
-            token_expires_at
-        ).fetch_one(&self.pool)
+            first_name,
+            last_name,
+            email,
+            password,
+            role as UserRole,
+            address,
+            city,
+            district,
+            contact_number
+        )
+        .fetch_one(&self.pool)
         .await?;
+
         Ok(user)
     }
 
     async fn get_user_count(&self) -> Result<i64, sqlx::Error> {
-        let count = sqlx::query_scalar!(
-            r#"SELECT COUNT(*) FROM users"#
-        )
-       .fetch_one(&self.pool)
-       .await?;
-
+        let count = sqlx::query_scalar!("SELECT COUNT(*) FROM users")
+            .fetch_one(&self.pool)
+            .await?;
         Ok(count.unwrap_or(0))
     }
 
-    async fn update_user_name<T: Into<String> + Send>(
+   
+}
+
+#[async_trait]
+pub trait ProductExt {
+    async fn create_product(
+        &self,
+        name: &str,
+        price: f64,
+        unit_type: &str,
+        commission: Option<f64>,
+    ) -> Result<Product, sqlx::Error>;
+
+    async fn get_product_by_id(&self, product_id: Uuid) -> Result<Option<Product>, sqlx::Error>;
+    async fn get_all_products(&self) -> Result<Vec<Product>, sqlx::Error>;
+}
+
+#[async_trait]
+impl ProductExt for DBClient {
+    async fn create_product(
+        &self,
+        name: &str,
+        price: f64,
+        unit_type: &str,
+        commission: Option<f64>,
+    ) -> Result<Product, sqlx::Error> {
+        let product = sqlx::query_as::<_, Product>(
+            "INSERT INTO products (name, price, unit_type, commission, created_at, updated_at)
+             VALUES ($1,$2,$3,$4,NOW(),NOW()) RETURNING *"
+        )
+        .bind(name)
+        .bind(price)
+        .bind(unit_type)
+        .bind(commission.unwrap_or(0.0))
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(product)
+    }
+
+    async fn get_product_by_id(&self, product_id: Uuid) -> Result<Option<Product>, sqlx::Error> {
+        let product = sqlx::query_as::<_, Product>("SELECT * FROM products WHERE id = $1")
+            .bind(product_id)
+            .fetch_optional(&self.pool)
+            .await?;
+        Ok(product)
+    }
+
+    async fn get_all_products(&self) -> Result<Vec<Product>, sqlx::Error> {
+    let products = sqlx::query_as::<_, Product>("SELECT * FROM products")
+        .fetch_all(&self.pool)
+        .await?;
+    Ok(products)
+}
+
+}
+
+
+#[async_trait]
+pub trait DeliveryExt {
+    async fn create_delivery(
         &self,
         user_id: Uuid,
-        new_name: T
-    ) -> Result<User, sqlx::Error> {
-        let user = sqlx::query_as!(
-            User,
-            r#"
-            UPDATE users
-            SET name = $1, updated_at = Now()
-            WHERE id = $2
-            RETURNING id, name, email, password, verified, created_at, updated_at, verification_token, token_expires_at, role as "role: UserRole"
-            "#,
-            new_name.into(),
-            user_id
-        ).fetch_one(&self.pool)
+        date: NaiveDate,
+        products: Vec<(Uuid, i32)>, // (product_id, quantity)
+    ) -> Result<Delivery, sqlx::Error>;
+
+    async fn get_deliveries_by_user(&self, user_id: Uuid) -> Result<Vec<Delivery>, sqlx::Error>;
+
+}
+#[async_trait]
+impl DeliveryExt for DBClient {
+    async fn create_delivery(
+    &self,
+    user_id: Uuid,
+    date: NaiveDate,
+    products: Vec<(Uuid, i32)>,
+) -> Result<Delivery, sqlx::Error> {
+    let mut tx: Transaction<'_, Postgres> = self.pool.begin().await?;
+
+    // Insert into deliveries
+    let delivery = sqlx::query_as::<_, Delivery>(
+        "INSERT INTO deliveries (date, userid)
+         VALUES ($1, $2)
+         RETURNING *"
+    )
+    .bind(date)
+    .bind(user_id)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    // Insert into delivery_product and update warehouse_stock
+    for (product_id, quantity) in &products {
+        // Insert into delivery_product
+        sqlx::query(
+            "INSERT INTO delivery_product (deliveryid, productid, quantity)
+             VALUES ($1, $2, $3)"
+        )
+        .bind(delivery.deliveryid)
+        .bind(product_id)
+        .bind(quantity)
+        .execute(&mut *tx)
         .await?;
 
-        Ok(user)
-    }
-
-    async fn update_user_role(
-        &self,
-        user_id: Uuid,
-        new_role: UserRole
-    ) -> Result<User, sqlx::Error> {
-        let user = sqlx::query_as!(
-            User,
-            r#"
-            UPDATE users
-            SET role = $1, updated_at = Now()
-            WHERE id = $2
-            RETURNING id, name, email, password, verified, created_at, updated_at, verification_token, token_expires_at, role as "role: UserRole"
-            "#,
-            new_role as UserRole,
-            user_id
-        ).fetch_one(&self.pool)
-       .await?;
-
-        Ok(user)
-    }
-
-    async fn update_user_password(
-        &self,
-        user_id: Uuid,
-        new_password: String
-    ) -> Result<User, sqlx::Error> {
-        let user = sqlx::query_as!(
-            User,
-            r#"
-            UPDATE users
-            SET password = $1, updated_at = Now()
-            WHERE id = $2
-            RETURNING id, name, email, password, verified, created_at, updated_at, verification_token, token_expires_at, role as "role: UserRole"
-            "#,
-            new_password,
-            user_id
-        ).fetch_one(&self.pool)
+        // Check if product exists in warehouse_stock
+        let exists = sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(SELECT 1 FROM warehouse_stock WHERE productid = $1)"
+        )
+        .bind(product_id)
+        .fetch_one(&mut *tx)
         .await?;
 
-        Ok(user)
+        if exists {
+            // Update existing stock
+            sqlx::query(
+                "UPDATE warehouse_stock 
+                 SET quantity = quantity + $2 
+                 WHERE productid = $1"
+            )
+            .bind(product_id)
+            .bind(quantity)
+            .execute(&mut *tx)
+            .await?;
+        } else {
+            // Insert new stock entry
+            sqlx::query(
+                "INSERT INTO warehouse_stock (productid, quantity)
+                 VALUES ($1, $2)"
+            )
+            .bind(product_id)
+            .bind(quantity)
+            .execute(&mut *tx)
+            .await?;
+        }
     }
 
-    async fn verifed_token(
-        &self,
-        token: &str,
-    ) -> Result<(), sqlx::Error> {
-        let _ =sqlx::query!(
-            r#"
-            UPDATE users
-            SET verified = true, 
-                updated_at = Now(),
-                verification_token = NULL,
-                token_expires_at = NULL
-            WHERE verification_token = $1
-            "#,
-            token
-        ).execute(&self.pool)
-       .await;
+    tx.commit().await?;
 
-        Ok(())
-    }
+    Ok(delivery)
+}
 
-    async fn add_verifed_token(
-        &self,
-        user_id: Uuid,
-        token: &str,
-        token_expires_at: DateTime<Utc>,
-    ) -> Result<(), sqlx::Error> {
-        let _ = sqlx::query!(
-            r#"
-            UPDATE users
-            SET verification_token = $1, token_expires_at = $2, updated_at = Now()
-            WHERE id = $3
-            "#,
-            token,
-            token_expires_at,
-            user_id,
-        ).execute(&self.pool)
-       .await?;
 
-        Ok(())
-    }
+    async fn get_deliveries_by_user(&self, user_id: Uuid) -> Result<Vec<Delivery>, sqlx::Error> {
+    let deliveries = sqlx::query_as::<_, Delivery>(
+        "SELECT * FROM deliveries WHERE userid = $1 ORDER BY date DESC"
+    )
+    .bind(user_id)
+    .fetch_all(&self.pool)
+    .await?;
+    Ok(deliveries)
+}
+
 }

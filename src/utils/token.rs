@@ -16,12 +16,14 @@ use crate::error::{ErrorMessage, HttpError};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TokenClaims{
     pub sub: String,
+    pub role: String,
     pub iat: usize,
     pub exp: usize,
 }
 
 pub fn create_token(
     user_id: &str,
+    user_role: &str,
     secret: &[u8],
     expires_in_seconds: i64,
 ) -> Result<String, jsonwebtoken::errors::Error> {
@@ -34,6 +36,7 @@ pub fn create_token(
     let exp = (now + Duration::minutes(expires_in_seconds)).timestamp() as usize;
     let claims = TokenClaims {
         sub: user_id.to_string(),
+        role: user_role.to_string(), 
         iat,
         exp,
     };
