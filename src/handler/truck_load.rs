@@ -4,16 +4,15 @@ use axum::{
     Json,
 };
 use std::sync::Arc;
-use crate::dtos::{CreateTruckLoadRequest, TruckLoadProductItem, CreateTruckLoadResponse};
+use crate::dtos::{CreateTruckLoadRequest, CreateTruckLoadResponse};
 use crate::error::{HttpError, ErrorMessage};
-use crate::db::{DBClient, TruckLoadExt};
+use crate::db::{ TruckLoadExt};
 use crate::models::UserRole;
 use crate::middleware::JWTAuthMiddeware;
 use crate::AppState;
 use axum::routing::{get, post};
 use axum::Router;
 use uuid::Uuid;
-use chrono::NaiveDate;
 
 pub fn truck_load_handler() -> Router {
     Router::new()

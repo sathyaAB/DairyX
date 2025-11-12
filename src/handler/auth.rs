@@ -1,13 +1,12 @@
 use std::sync::Arc;
 
-use axum::{extract::Query, http::{header, HeaderMap, StatusCode}, response::{IntoResponse, Redirect}, routing::{get, post}, Extension, Json, Router};
-use axum_extra::extract::cookie::Cookie;
-use chrono::{Utc, Duration};
+use axum::{http::{ StatusCode}, response::{IntoResponse}, routing::{get, post}, Extension, Json, Router};
+
 use validator::Validate;
 use crate::models::UserRole;
 
 
-use crate::{db::UserExt, dtos::{LoginUserDto, RegisterUserDto, Response, UserLoginResponseDto}, error::{ErrorMessage, HttpError}, mail::mails::{send_forgot_password_email, send_verification_email, send_welcome_email}, utils::{password, token}, AppState};
+use crate::{db::UserExt, dtos::{LoginUserDto, RegisterUserDto, Response, UserLoginResponseDto}, error::{HttpError},  utils::{password, token}, AppState};
 
 pub fn auth_handler() -> Router {
     Router::new()

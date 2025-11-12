@@ -1,7 +1,7 @@
 use chrono::prelude::*;
 use serde::{Deserialize, Serialize};
 use chrono::NaiveDate;
-
+use rust_decimal::Decimal;
 
 #[derive(Debug, Deserialize, Serialize, Clone, Copy, sqlx::Type, PartialEq)]
 #[sqlx(type_name = "user_role", rename_all = "lowercase")]
@@ -127,4 +127,15 @@ pub struct SaleProduct {
     pub salesid: uuid::Uuid,
     pub productid: uuid::Uuid,
     pub quantity: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
+pub struct Payment {
+    pub paymentid: uuid::Uuid,
+    pub salesid: uuid::Uuid,
+    pub amount: f64,
+    pub method: String,
+    pub date: chrono::NaiveDate,
+    pub created_at: Option<chrono::NaiveDateTime>,
+    pub updated_at: Option<chrono::NaiveDateTime>,
 }

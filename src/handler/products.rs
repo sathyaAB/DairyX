@@ -1,12 +1,12 @@
 use axum::{
-    extract::{Path, Query, Extension},
+    extract::{Path, Extension},
     http::StatusCode,
     Json,
 };
 use std::sync::Arc;
 use crate::dtos::{CreateProductDto, ProductResponseDto, ProductsListResponseDto};
 use crate::error::{HttpError, ErrorMessage};
-use crate::db::{DBClient, ProductExt};
+use crate::db::{ ProductExt};
 use crate::models::UserRole;
 use crate::middleware::JWTAuthMiddeware;
 use crate::AppState;

@@ -5,7 +5,6 @@ use axum::{
 use std::sync::Arc;
 use crate::dtos::{FilterUserDto, UserListResponseDto, RequestQueryDto};
 use crate::error::HttpError;
-use crate::db::DBClient;
 use crate::AppState;
 use axum::routing::get;
 use axum::Router;

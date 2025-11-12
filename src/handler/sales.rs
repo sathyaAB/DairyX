@@ -4,16 +4,15 @@ use axum::{
     Json,
 };
 use std::sync::Arc;
-use crate::dtos::{CreateSaleRequest, SaleProductItem, CreateSaleResponse};
+use crate::dtos::{CreateSaleRequest, CreateSaleResponse};
 use crate::error::{HttpError, ErrorMessage};
-use crate::db::{DBClient, SalesExt};
+use crate::db::{SalesExt};
 use crate::models::UserRole;
 use crate::middleware::JWTAuthMiddeware;
 use crate::AppState;
 use axum::routing::post;
 use axum::Router;
 use uuid::Uuid;
-use chrono::NaiveDate;
 
 pub fn sales_handler() -> Router {
     Router::new()

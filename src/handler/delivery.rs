@@ -1,12 +1,12 @@
 use axum::{
-    extract::{Path, Extension},  
+    extract::{ Extension},  
     http::StatusCode,
     Json,
 };
 use std::sync::Arc;
 use crate::dtos::{CreateDeliveryDto, DeliveryResponseDto, DeliveryListResponseDto};
 use crate::error::{HttpError, ErrorMessage};
-use crate::db::{DBClient, DeliveryExt};
+use crate::db::{ DeliveryExt};
 use crate::models::UserRole;
 use crate::middleware::JWTAuthMiddeware;
 use crate::AppState;

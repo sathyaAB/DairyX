@@ -1,11 +1,11 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc, NaiveDate};
-use sqlx::{Pool, Postgres, Row, PgPool, Error, Transaction, Executor};
+use chrono::{ NaiveDate};
+use sqlx::{Pool, Postgres, Transaction};
 use uuid::Uuid;
 
-use crate::models::{User, UserRole, Product, TruckLoad, Sale};
+use crate::models::{User, UserRole, Product, TruckLoad, Sale, Payment};
 
-use crate::models::{Delivery, DeliveryProduct, WarehouseStock};
+use crate::models::{Delivery};
 
 #[derive(Debug, Clone)]
 pub struct DBClient {
@@ -495,4 +495,59 @@ impl SalesExt for DBClient {
     }
 
 
+}
+
+
+
+#[async_trait]
+pub trait PaymentExt {
+    async fn create_payment(
+        &self,
+        salesid: Uuid,
+        amount: f64,
+        method: String,
+        date: NaiveDate,
+    ) -> Result<Payment, sqlx::Error>;
+
+    async fn get_payments_by_sales(&self, salesid: Uuid) -> Result<Vec<Payment>, sqlx::Error>;
+}
+
+#[async_trait]
+impl PaymentExt for DBClient {
+    async fn create_payment(
+        &self,
+        salesid: Uuid,
+        amount: f64,
+        method: String,
+        date: NaiveDate,
+    ) -> Result<Payment, sqlx::Error> {
+        let mut tx: Transaction<'_, Postgres> = self.pool.begin().await?;
+
+        let payment = sqlx::query_as::<_, Payment>(
+            "INSERT INTO payment (salesid, amount, method, date, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, NOW(), NOW())
+             RETURNING *"
+        )
+        .bind(salesid)
+        .bind(amount)
+        .bind(method)
+        .bind(date)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+
+        Ok(payment)
+    }
+
+    async fn get_payments_by_sales(&self, salesid: Uuid) -> Result<Vec<Payment>, sqlx::Error> {
+        let payments = sqlx::query_as::<_, Payment>(
+            "SELECT * FROM payment WHERE salesid = $1 ORDER BY date DESC"
+        )
+        .bind(salesid)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(payments)
+    }
 }

@@ -206,3 +206,17 @@ pub struct CreateSaleResponse {
     pub salesid: Uuid,
     pub message: String,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct CreatePaymentRequest {
+    pub salesid: Uuid,
+    pub amount: f64,
+    pub method: String, // e.g., "cash", "card", "online"
+    pub date: NaiveDate,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CreatePaymentResponse {
+    pub paymentid: Uuid,
+    pub message: String,
+}
