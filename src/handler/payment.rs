@@ -6,7 +6,7 @@ use axum::{
 use std::sync::Arc;
 use crate::dtos::{CreatePaymentRequest, CreatePaymentResponse};
 use crate::error::{HttpError, ErrorMessage};
-use crate::db::{DBClient, PaymentExt};
+use crate::db::{PaymentExt};
 use crate::middleware::JWTAuthMiddeware;
 use crate::AppState;
 use axum::routing::post;

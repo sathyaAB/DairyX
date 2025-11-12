@@ -1,5 +1,5 @@
 use core::str;
-use chrono::{DateTime, NaiveDate, Utc};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 use uuid::Uuid;
@@ -218,5 +218,40 @@ pub struct CreatePaymentRequest {
 #[derive(Debug, Serialize)]
 pub struct CreatePaymentResponse {
     pub paymentid: Uuid,
+    pub message: String,
+}
+
+
+#[derive(Debug, Deserialize)]
+pub struct CreateAllowanceRequest {
+    pub date: NaiveDate,
+    pub amount: f64,  
+    pub notes: Option<String>, 
+}
+
+#[derive(Debug, Serialize)]
+pub struct CreateAllowanceResponse {
+    pub allowanceid: Uuid,
+    pub message: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AllowanceResponse {
+    pub allowanceid: Uuid,
+    pub date: NaiveDate,
+    pub amount: f64,
+    pub created_at: Option<NaiveDateTime>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateTruckAllowanceRequest {
+    pub allowanceid: Uuid,   
+    pub truckid: Uuid,       
+    pub amount: f64,        
+}
+
+#[derive(Debug, Serialize)]
+pub struct CreateTruckAllowanceResponse {
+    pub truck_allowance_id: Uuid,
     pub message: String,
 }

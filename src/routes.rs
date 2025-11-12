@@ -38,6 +38,11 @@ pub fn create_router(app_state: Arc<AppState>) -> Router {
             crate::handler::payment::payment_handler()
                 .layer(middleware::from_fn(auth))
         )
+        .nest(
+            "/allowance",
+            crate::handler::allowance::allowance_handler()
+                .layer(middleware::from_fn(auth))
+        )
         .layer(TraceLayer::new_for_http())
         .layer(Extension(app_state));
 

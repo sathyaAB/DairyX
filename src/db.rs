@@ -3,9 +3,12 @@ use chrono::{ NaiveDate};
 use sqlx::{Pool, Postgres, Transaction};
 use uuid::Uuid;
 
-use crate::models::{User, UserRole, Product, TruckLoad, Sale, Payment};
+use crate::models::{User, UserRole, Product, TruckLoad, Sale, Payment, Allowance, TruckAllowance};
 
 use crate::models::{Delivery};
+use sqlx::Executor; 
+
+
 
 #[derive(Debug, Clone)]
 pub struct DBClient {
@@ -451,7 +454,6 @@ pub trait SalesExt {
     ) -> Result<Sale, sqlx::Error>;
 
 }
-
 #[async_trait]
 impl SalesExt for DBClient {
     async fn create_sale(
@@ -459,23 +461,38 @@ impl SalesExt for DBClient {
         truckload_id: Uuid,
         shop_id: Uuid,
         date: NaiveDate,
-        products: Vec<(Uuid, i32)>,
+        products: Vec<(Uuid, i32)>, // (product_id, quantity)
     ) -> Result<Sale, sqlx::Error> {
         let mut tx: Transaction<'_, Postgres> = self.pool.begin().await?;
 
-        // 1. Insert into sales table
+        // ✅ Step 1: Calculate total amount
+        let mut total_amount: f64 = 0.0;
+
+        for (product_id, quantity) in &products {
+            let price: f64 = sqlx::query_scalar(
+                "SELECT price FROM products WHERE id = $1"
+            )
+            .bind(product_id)
+            .fetch_one(&mut *tx)
+            .await?;
+
+            total_amount += price * (*quantity as f64);
+        }
+
+        // ✅ Step 2: Insert into sales table with total_amount and paid_amount = 0
         let sale = sqlx::query_as::<_, Sale>(
-            "INSERT INTO sales (truckloadid, shopid, date, status)
-             VALUES ($1, $2, $3, 'pending')
+            "INSERT INTO sales (truckloadid, shopid, date, status, total_amount, paid_amount)
+             VALUES ($1, $2, $3, 'pending', $4, 0)
              RETURNING *"
         )
         .bind(truckload_id)
         .bind(shop_id)
         .bind(date)
+        .bind(total_amount)
         .fetch_one(&mut *tx)
         .await?;
 
-        // 2. Insert into sales_product table
+        // ✅ Step 3: Insert into sales_product table
         for (product_id, quantity) in &products {
             sqlx::query(
                 "INSERT INTO sales_product (salesid, productid, quantity)
@@ -488,14 +505,13 @@ impl SalesExt for DBClient {
             .await?;
         }
 
-        // 3. Commit transaction
+        // ✅ Step 4: Commit transaction
         tx.commit().await?;
 
         Ok(sale)
     }
-
-
 }
+
 
 
 
@@ -509,45 +525,126 @@ pub trait PaymentExt {
         date: NaiveDate,
     ) -> Result<Payment, sqlx::Error>;
 
-    async fn get_payments_by_sales(&self, salesid: Uuid) -> Result<Vec<Payment>, sqlx::Error>;
 }
 
 #[async_trait]
 impl PaymentExt for DBClient {
-    async fn create_payment(
+   async fn create_payment(
+    &self,
+    salesid: Uuid,
+    amount: f64,
+    method: String,
+    date: NaiveDate,
+) -> Result<Payment, sqlx::Error> {
+    let mut tx: Transaction<'_, Postgres> = self.pool.begin().await?;
+
+    // 1️⃣ Insert payment
+    let payment = sqlx::query_as::<_, Payment>(
+        "INSERT INTO payment (salesid, amount, method, date, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, NOW(), NOW())
+         RETURNING *"
+    )
+    .bind(salesid)
+    .bind(amount)
+    .bind(method)
+    .bind(date)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    // 2️⃣ Update paid_amount in sales table
+    sqlx::query(
+        "UPDATE sales
+         SET paid_amount = COALESCE(paid_amount, 0) + $1,
+             updated_at = NOW()
+         WHERE salesid = $2"
+    )
+    .bind(amount)
+    .bind(salesid)
+    .execute(&mut *tx)
+    .await?;
+
+     sqlx::query(
+        "UPDATE sales
+         SET status = 'paid', updated_at = NOW()
+         WHERE salesid = $1 AND COALESCE(paid_amount, 0) >= COALESCE(total_amount, 0)"
+    )
+    .bind(salesid)
+    .execute(&mut *tx)
+    .await?;
+
+    // 3️⃣ Commit transaction
+    tx.commit().await?;
+
+    Ok(payment)
+}
+
+
+}
+
+
+#[async_trait]
+pub trait AllowanceExt {
+    async fn create_allowance(
         &self,
-        salesid: Uuid,
-        amount: f64,
-        method: String,
         date: NaiveDate,
-    ) -> Result<Payment, sqlx::Error> {
+        amount: f64,
+        notes: Option<String>,
+    ) -> Result<Allowance, sqlx::Error>;
+    async fn create_truck_allowance(
+        &self,
+        allowanceid: Uuid,
+        truckid: Uuid,
+        amount: f64,
+    ) -> Result<TruckAllowance, sqlx::Error>;
+}
+
+#[async_trait]
+impl AllowanceExt for DBClient {
+    async fn create_allowance(
+        &self,
+        date: NaiveDate,
+        amount: f64,
+        notes: Option<String>,
+    ) -> Result<Allowance, sqlx::Error> {
         let mut tx: Transaction<'_, Postgres> = self.pool.begin().await?;
 
-        let payment = sqlx::query_as::<_, Payment>(
-            "INSERT INTO payment (salesid, amount, method, date, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, NOW(), NOW())
+        let allowance = sqlx::query_as::<_, Allowance>(
+            "INSERT INTO allowance (date, amount, notes, created_at, updated_at)
+             VALUES ($1, $2, $3, NOW(), NOW())
              RETURNING *"
         )
-        .bind(salesid)
-        .bind(amount)
-        .bind(method)
         .bind(date)
+        .bind(amount)
+        .bind(notes)
         .fetch_one(&mut *tx)
         .await?;
 
         tx.commit().await?;
 
-        Ok(payment)
+        Ok(allowance)
     }
 
-    async fn get_payments_by_sales(&self, salesid: Uuid) -> Result<Vec<Payment>, sqlx::Error> {
-        let payments = sqlx::query_as::<_, Payment>(
-            "SELECT * FROM payment WHERE salesid = $1 ORDER BY date DESC"
+   async fn create_truck_allowance(
+        &self,
+        allowanceid: Uuid,
+        truckid: Uuid,
+        amount: f64,
+    ) -> Result<TruckAllowance, sqlx::Error> {
+        let mut tx: Transaction<'_, Postgres> = self.pool.begin().await?;
+
+        let truck_allowance = sqlx::query_as::<_, TruckAllowance>(
+            "INSERT INTO truck_allowance (allowanceid, truckid, amount, created_at, updated_at)
+             VALUES ($1, $2, $3, NOW(), NOW())
+             RETURNING *"
         )
-        .bind(salesid)
-        .fetch_all(&self.pool)
+        .bind(allowanceid)
+        .bind(truckid)
+        .bind(amount)
+        .fetch_one(&mut *tx)
         .await?;
 
-        Ok(payments)
+        tx.commit().await?;
+        Ok(truck_allowance)
     }
+
 }

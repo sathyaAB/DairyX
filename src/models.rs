@@ -118,6 +118,8 @@ pub struct Sale {
     pub shopid: uuid::Uuid,
     pub date: NaiveDate,
     pub status: String,
+    pub total_amount: f64,  
+    pub paid_amount: f64,    
     pub created_at: Option<NaiveDateTime>,
     pub updated_at: Option<NaiveDateTime>,
 }
@@ -138,4 +140,24 @@ pub struct Payment {
     pub date: chrono::NaiveDate,
     pub created_at: Option<chrono::NaiveDateTime>,
     pub updated_at: Option<chrono::NaiveDateTime>,
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
+pub struct Allowance {
+    pub allowanceid: uuid::Uuid,
+    pub date: NaiveDate,
+    pub amount: f64,
+    pub notes: Option<String>,
+    pub created_at: Option<NaiveDateTime>,
+    pub updated_at: Option<NaiveDateTime>,
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
+pub struct TruckAllowance {
+    pub id: uuid::Uuid,
+    pub allowanceid: uuid::Uuid,
+    pub truckid: uuid::Uuid,
+    pub amount: f64,
+    pub created_at: Option<NaiveDateTime>,
+    pub updated_at: Option<NaiveDateTime>,
 }
