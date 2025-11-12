@@ -1,9 +1,9 @@
 use core::str;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use validator::Validate;
-
-use crate::models::{User, UserRole, Product, Delivery};
+use uuid::Uuid;
+use crate::models::{User, UserRole, Product, Delivery, TruckLoad};
 
 
 
@@ -163,3 +163,46 @@ pub struct DeliveryListResponseDto {
     pub deliveries: Vec<Delivery>,
 }
 
+
+#[derive(Debug, Deserialize)]
+pub struct CreateTruckLoadRequest {
+    pub truck_id: Uuid,                // Truck being used
+    pub driver_id: Uuid,               // Driver assigned for the truck load
+    pub date: NaiveDate,              // Date of the load
+    pub products: Vec<TruckLoadProductItem>,
+}
+
+
+#[derive(Debug, Deserialize)]
+pub struct TruckLoadProductItem {
+    pub product_id: Uuid,              // product id (Uuid)
+    pub quantity: i32,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CreateTruckLoadResponse {
+    pub truckloadid: Uuid,    
+    pub driver_id: Uuid,               // Driver assigned for the truck load
+    pub message: String,
+}
+
+
+#[derive(Debug, Deserialize)]
+pub struct SaleProductItem {
+    pub product_id: Uuid,
+    pub quantity: i32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateSaleRequest {
+    pub truckload_id: Uuid,  // TruckLoad delivering the products
+    pub shop_id: Uuid,       // Shop receiving the sale
+    pub date: NaiveDate,
+    pub products: Vec<SaleProductItem>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CreateSaleResponse {
+    pub salesid: Uuid,
+    pub message: String,
+}

@@ -75,3 +75,56 @@ pub struct WarehouseStock {
     pub quantity: i32,
 }
 
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
+pub struct Truck {
+    pub truckid: uuid::Uuid,
+    pub trucknumber: String,
+    pub model: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
+pub struct TruckLoad {
+    pub truckloadid: uuid::Uuid,
+    pub date: chrono::NaiveDate,
+    pub userid: uuid::Uuid,
+    pub truckid: uuid::Uuid,
+    pub created_at: Option<chrono::NaiveDateTime>,
+    pub updated_at: Option<chrono::NaiveDateTime>,
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
+pub struct TruckLoadProduct {
+    pub truckloadid: uuid::Uuid,
+    pub productid: uuid::Uuid,
+    pub quantity: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
+pub struct Shop {
+    pub shopid: uuid::Uuid,               
+    pub name: String,                 
+    pub address: String,               
+    pub city: Option<String>,          
+    pub district: Option<String>,      
+    pub contact_number: Option<String>, 
+    pub created_at: Option<NaiveDateTime>,
+    pub updated_at: Option<NaiveDateTime>,
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
+pub struct Sale {
+    pub salesid: uuid::Uuid,
+    pub truckloadid: uuid::Uuid,
+    pub shopid: uuid::Uuid,
+    pub date: NaiveDate,
+    pub status: String,
+    pub created_at: Option<NaiveDateTime>,
+    pub updated_at: Option<NaiveDateTime>,
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
+pub struct SaleProduct {
+    pub salesid: uuid::Uuid,
+    pub productid: uuid::Uuid,
+    pub quantity: i32,
+}

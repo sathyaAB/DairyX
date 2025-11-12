@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc, NaiveDate};
 use sqlx::{Pool, Postgres, Row, PgPool, Error, Transaction, Executor};
 use uuid::Uuid;
 
-use crate::models::{User, UserRole, Product};
+use crate::models::{User, UserRole, Product, TruckLoad, Sale};
 
 use crate::models::{Delivery, DeliveryProduct, WarehouseStock};
 
@@ -347,5 +347,152 @@ impl DeliveryExt for DBClient {
     .await?;
     Ok(deliveries)
 }
+
+}
+
+#[async_trait]
+pub trait TruckLoadExt {
+    async fn create_truck_load(
+        &self,
+        user_id: Uuid,
+        truck_id: Uuid,
+        date: NaiveDate,
+        products: Vec<(Uuid, i32)>, // (product_id, quantity)
+    ) -> Result<TruckLoad, sqlx::Error>;
+
+    async fn get_all_truck_loads(&self) -> Result<Vec<TruckLoad>, sqlx::Error>;
+}
+
+#[async_trait]
+impl TruckLoadExt for DBClient {
+    async fn create_truck_load(
+        &self,
+        user_id: Uuid,
+        truck_id: Uuid,
+        date: NaiveDate,
+        products: Vec<(Uuid, i32)>,
+    ) -> Result<TruckLoad, sqlx::Error> {
+        let mut tx: Transaction<'_, Postgres> = self.pool.begin().await?;
+
+        // 1. Insert into truck_load table
+        let truck_load = sqlx::query_as::<_, TruckLoad>(
+            "INSERT INTO truck_loads (date, userid, truckid)
+             VALUES ($1, $2, $3)
+             RETURNING *"
+        )
+        .bind(date)
+        .bind(user_id)
+        .bind(truck_id)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        // 2. Loop through products to insert into truckload_products and decrease warehouse_stock
+        for (product_id, quantity) in &products {
+            // Check warehouse stock
+            let current_stock: i32 = sqlx::query_scalar(
+                "SELECT quantity FROM warehouse_stock WHERE productid = $1"
+            )
+            .bind(product_id)
+            .fetch_one(&mut *tx)
+            .await?;
+
+            if *quantity > current_stock {
+                return Err(sqlx::Error::RowNotFound); // or a custom error
+            }
+
+            // Insert into truckload_products
+            sqlx::query(
+                "INSERT INTO truck_load_products (truckloadid, productid, quantity)
+                 VALUES ($1, $2, $3)"
+            )
+            .bind(truck_load.truckloadid)
+            .bind(product_id)
+            .bind(quantity)
+            .execute(&mut *tx)
+            .await?;
+
+            // Decrease warehouse stock
+            sqlx::query(
+                "UPDATE warehouse_stock
+                 SET quantity = quantity - $2
+                 WHERE productid = $1"
+            )
+            .bind(product_id)
+            .bind(quantity)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        // 3. Commit transaction
+        tx.commit().await?;
+
+        Ok(truck_load)
+    }
+
+    async fn get_all_truck_loads(&self) -> Result<Vec<TruckLoad>, sqlx::Error> {
+        let truck_loads = sqlx::query_as::<_, TruckLoad>(
+            "SELECT * FROM truck_loads ORDER BY date DESC"
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(truck_loads)
+    }
+}
+
+
+#[async_trait]
+pub trait SalesExt {
+    async fn create_sale(
+        &self,
+        truckload_id: Uuid,
+        shop_id: Uuid,
+        date: NaiveDate,
+        products: Vec<(Uuid, i32)>, // (product_id, quantity)
+    ) -> Result<Sale, sqlx::Error>;
+
+}
+
+#[async_trait]
+impl SalesExt for DBClient {
+    async fn create_sale(
+        &self,
+        truckload_id: Uuid,
+        shop_id: Uuid,
+        date: NaiveDate,
+        products: Vec<(Uuid, i32)>,
+    ) -> Result<Sale, sqlx::Error> {
+        let mut tx: Transaction<'_, Postgres> = self.pool.begin().await?;
+
+        // 1. Insert into sales table
+        let sale = sqlx::query_as::<_, Sale>(
+            "INSERT INTO sales (truckloadid, shopid, date, status)
+             VALUES ($1, $2, $3, 'pending')
+             RETURNING *"
+        )
+        .bind(truckload_id)
+        .bind(shop_id)
+        .bind(date)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        // 2. Insert into sales_product table
+        for (product_id, quantity) in &products {
+            sqlx::query(
+                "INSERT INTO sales_product (salesid, productid, quantity)
+                 VALUES ($1, $2, $3)"
+            )
+            .bind(sale.salesid)
+            .bind(product_id)
+            .bind(quantity)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        // 3. Commit transaction
+        tx.commit().await?;
+
+        Ok(sale)
+    }
+
 
 }
