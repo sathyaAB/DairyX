@@ -323,4 +323,17 @@ pub struct PendingPaymentResponse {
     pub shop_address: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateTruckLoadQuantityRequest {
+    pub truckloadid: Uuid,
+    pub productid: Uuid,
+    pub remaining_quantity: i32, 
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateTruckLoadQuantityResponse {
+    pub truckloadid: Uuid,
+    pub productid: Uuid,
+    pub remaining_quantity: i32,
+}
 

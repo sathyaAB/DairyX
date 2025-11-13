@@ -11,7 +11,8 @@ use crate::dtos::DailyProductSaleResponse;
 use crate::dtos::AllowanceDistributionResponse;
 use crate::dtos::TruckAllowanceInfo;
 use crate::dtos::PendingPaymentResponse;
-
+use crate::dtos::AllowanceDistributionRequest;
+use crate::dtos::UpdateTruckLoadQuantityResponse;
 
 #[derive(Debug, Clone)]
 pub struct DBClient {
@@ -367,6 +368,13 @@ pub trait TruckLoadExt {
     ) -> Result<TruckLoad, sqlx::Error>;
 
     async fn get_all_truck_loads(&self) -> Result<Vec<TruckLoad>, sqlx::Error>;
+
+    async fn update_remaining_quantity(
+        &self,
+        truckloadid: Uuid,
+        productid: Uuid,
+        delivered_quantity: i32,
+    ) -> Result<(Uuid, Uuid, i32), sqlx::Error>; 
 }
 
 #[async_trait]
@@ -443,8 +451,50 @@ impl TruckLoadExt for DBClient {
         .await?;
         Ok(truck_loads)
     }
-}
 
+    async fn update_remaining_quantity(
+        &self,
+        truckloadid: Uuid,
+        productid: Uuid,
+        remaining_quantity: i32,
+    ) -> Result<(Uuid, Uuid, i32), sqlx::Error> { // returns (truckloadid, productid, remaining_quantity)
+        let mut tx: Transaction<'_, Postgres> = self.pool.begin().await?;
+
+        // 1. Decrease remaining_quantity in truck_load_products
+        let updated = sqlx::query!(
+            r#"
+            UPDATE truck_load_products
+            SET remaining_quantity = remaining_quantity + $1
+            WHERE truckloadid = $2 AND productid = $3
+            RETURNING remaining_quantity
+            "#,
+            remaining_quantity,
+            truckloadid,
+            productid
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+
+        // 2. Increase warehouse stock
+        sqlx::query!(
+            r#"
+            UPDATE warehouse_stock
+            SET quantity = quantity + $1
+            WHERE productid = $2
+            "#,
+            remaining_quantity,
+            productid
+        )
+        .execute(&mut *tx)
+        .await?;
+
+        // 3. Commit transaction
+        tx.commit().await?;
+
+        Ok((truckloadid, productid, updated.remaining_quantity))
+    }
+
+}
 
 #[async_trait]
 pub trait SalesExt {

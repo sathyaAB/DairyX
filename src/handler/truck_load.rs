@@ -4,13 +4,13 @@ use axum::{
     Json,
 };
 use std::sync::Arc;
-use crate::dtos::{CreateTruckLoadRequest, CreateTruckLoadResponse};
+use crate::dtos::{CreateTruckLoadRequest, CreateTruckLoadResponse,UpdateTruckLoadQuantityResponse, UpdateTruckLoadQuantityRequest};
 use crate::error::{HttpError, ErrorMessage};
 use crate::db::{ TruckLoadExt};
 use crate::models::UserRole;
 use crate::middleware::JWTAuthMiddeware;
 use crate::AppState;
-use axum::routing::{get, post};
+use axum::routing::{get, post, patch};
 use axum::Router;
 use uuid::Uuid;
 
@@ -18,6 +18,8 @@ pub fn truck_load_handler() -> Router {
     Router::new()
         .route("/create", post(create_truck_load))
         .route("/history", get(get_truck_load_history))
+        .route("/update-remaining", patch( update_remaining_quantity))
+        
 }
 pub async fn create_truck_load(
     Extension(jwt_auth): Extension<JWTAuthMiddeware>,
@@ -85,6 +87,39 @@ pub async fn get_truck_load_history(
             message: format!("Truck load on {}", t.date),
         })
         .collect();
+
+    Ok(Json(response))
+}
+
+pub async fn update_remaining_quantity(
+    Extension(jwt_auth): Extension<JWTAuthMiddeware>,
+    Extension(app_state): Extension<Arc<AppState>>,
+    Json(body): Json<UpdateTruckLoadQuantityRequest>,
+) -> Result<Json<UpdateTruckLoadQuantityResponse>, HttpError> {
+    // Only Admin or Manager can update
+    if jwt_auth.user.role != UserRole::Manager && jwt_auth.user.role != UserRole::Admin {
+        return Err(HttpError::new(
+            ErrorMessage::PermissionDenied.to_string(),
+            StatusCode::FORBIDDEN,
+        ));
+    }
+
+    // Update remaining quantity and warehouse stock
+    let result = app_state.db_client
+        .update_remaining_quantity(
+            body.truckloadid,
+            body.productid,
+            body.remaining_quantity
+        )
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    // Map result to response DTO
+    let response = UpdateTruckLoadQuantityResponse {
+        truckloadid: result.0,
+        productid: result.1,
+        remaining_quantity: result.2,
+    };
 
     Ok(Json(response))
 }
