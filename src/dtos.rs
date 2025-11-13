@@ -313,3 +313,14 @@ pub struct AllowanceDistributionResponse {
     pub distributed: Vec<TruckAllowanceInfo>,
 }
 
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
+pub struct PendingPaymentResponse {
+    pub salesid: uuid::Uuid,
+    pub total_amount: f64,
+    pub paid_amount: f64,
+    pub remaining_amount: f64,
+    pub shop_name: String,
+    pub shop_address: String,
+}
+
+

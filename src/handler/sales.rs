@@ -4,7 +4,8 @@ use axum::{
     Json,
 };
 use std::sync::Arc;
-use crate::dtos::{CreateSaleRequest, CreateSaleResponse, DailyProductSaleRequest, DailyProductSaleListResponse, DailySalesRevenueResponse, DailyCommissionRequest, DailyCommissionResponse};
+use crate::dtos::{CreateSaleRequest, CreateSaleResponse, DailyProductSaleRequest, DailyProductSaleListResponse, DailySalesRevenueResponse, DailyCommissionRequest, DailyCommissionResponse,
+                    PendingPaymentResponse};
 use crate::error::{HttpError, ErrorMessage};
 use crate::db::{SalesExt};
 use crate::models::UserRole;
@@ -20,6 +21,7 @@ pub fn sales_handler() -> Router {
         .route("/daily-product-sales", get(get_daily_product_sales))
         .route("/daily-sales-revenue", get(get_daily_sales_revenue))
         .route("/daily-commission", get(get_daily_commission))
+        .route("/pending-payments", get(get_pending_payments))
 }
 
 pub async fn create_sale(
@@ -59,9 +61,16 @@ pub async fn create_sale(
 }
 
 pub async fn get_daily_product_sales(
+    Extension(jwt_auth): Extension<JWTAuthMiddeware>,
     Extension(app_state): Extension<Arc<AppState>>,
     Json(body): Json<DailyProductSaleRequest>,
 ) -> Result<Json<DailyProductSaleListResponse>, HttpError> {
+    if jwt_auth.user.role != UserRole::Admin {
+        return Err(HttpError::new(
+            ErrorMessage::PermissionDenied.to_string(),
+            StatusCode::FORBIDDEN,
+        ));
+    }
     let sales = app_state.db_client
         .get_daily_product_sales(body.date)
         .await
@@ -75,9 +84,16 @@ pub async fn get_daily_product_sales(
 }
 
 pub async fn get_daily_sales_revenue(
+    Extension(jwt_auth): Extension<JWTAuthMiddeware>,
     Extension(app_state): Extension<Arc<AppState>>,
     Json(body): Json<DailyProductSaleRequest>, 
 ) -> Result<Json<DailySalesRevenueResponse>, HttpError> {
+    if jwt_auth.user.role != UserRole::Admin {
+        return Err(HttpError::new(
+            ErrorMessage::PermissionDenied.to_string(),
+            StatusCode::FORBIDDEN,
+        ));
+    }
     let total_revenue = app_state.db_client
         .get_daily_total_sales_revenue(body.date)
         .await
@@ -91,9 +107,16 @@ pub async fn get_daily_sales_revenue(
 
 
 pub async fn get_daily_commission(
+    Extension(jwt_auth): Extension<JWTAuthMiddeware>,
     Extension(app_state): Extension<Arc<AppState>>,
     Json(body): Json<DailyCommissionRequest>,
 ) -> Result<Json<DailyCommissionResponse>, HttpError> {
+    if jwt_auth.user.role != UserRole::Admin {
+        return Err(HttpError::new(
+            ErrorMessage::PermissionDenied.to_string(),
+            StatusCode::FORBIDDEN,
+        ));
+    }
     let total_commission = app_state.db_client
         .get_daily_commission(body.date)
         .await
@@ -103,6 +126,24 @@ pub async fn get_daily_commission(
         date: body.date,
         total_commission,
     }))
+}
+
+pub async fn get_pending_payments(
+    Extension(jwt_auth): Extension<JWTAuthMiddeware>,
+    Extension(app_state): Extension<Arc<AppState>>,
+) -> Result<Json<Vec<PendingPaymentResponse>>, HttpError> {
+    if jwt_auth.user.role != UserRole::Admin {
+        return Err(HttpError::new(
+            ErrorMessage::PermissionDenied.to_string(),
+            StatusCode::FORBIDDEN,
+        ));
+    }
+    let payments = app_state.db_client
+        .get_pending_payments()
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    Ok(Json(payments))
 }
 
 

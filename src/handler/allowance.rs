@@ -69,9 +69,17 @@ pub async fn create_truck_allowance(
 }
 
 pub async fn get_allowance_distribution(
+    Extension(jwt_auth): Extension<JWTAuthMiddeware>,
     Extension(app_state): Extension<Arc<AppState>>,
     Json(body): Json<AllowanceDistributionRequest>,
 ) -> Result<Json<AllowanceDistributionResponse>, HttpError> {
+    if jwt_auth.user.role != crate::models::UserRole::Manager &&
+       jwt_auth.user.role != crate::models::UserRole::Admin {
+        return Err(HttpError::new(
+            ErrorMessage::PermissionDenied.to_string(),
+            StatusCode::FORBIDDEN,
+        ));
+    }
     let distribution = app_state.db_client
         .get_allowance_distribution_by_date(body.date)
         .await

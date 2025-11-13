@@ -10,6 +10,7 @@ use sqlx::Executor;
 use crate::dtos::DailyProductSaleResponse;
 use crate::dtos::AllowanceDistributionResponse;
 use crate::dtos::TruckAllowanceInfo;
+use crate::dtos::PendingPaymentResponse;
 
 
 #[derive(Debug, Clone)]
@@ -469,6 +470,9 @@ pub trait SalesExt {
         &self,
         date: NaiveDate,
     ) -> Result<f64, sqlx::Error>;
+
+    async fn get_pending_payments(&self) -> Result<Vec<PendingPaymentResponse>, sqlx::Error>;
+
 }
 #[async_trait]
 impl SalesExt for DBClient {
@@ -592,6 +596,27 @@ impl SalesExt for DBClient {
         Ok(total_commission.unwrap_or(0.0))
     }
 
+    async fn get_pending_payments(&self) -> Result<Vec<PendingPaymentResponse>, sqlx::Error> {
+        let payments = sqlx::query_as::<_, PendingPaymentResponse>(
+            r#"
+            SELECT 
+                s.salesid,
+                s.total_amount,
+                s.paid_amount,
+                (s.total_amount - s.paid_amount) AS remaining_amount,
+                sh.name AS shop_name,
+                sh.address AS shop_address
+            FROM sales s
+            JOIN shops sh ON s.shopid = sh.shopid
+            WHERE s.status = 'pending'
+            ORDER BY s.date DESC
+            "#
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(payments)
+    }
 
 
 
