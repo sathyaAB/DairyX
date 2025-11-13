@@ -457,6 +457,11 @@ pub trait SalesExt {
         &self,
         date: NaiveDate,
     ) -> Result<Vec<DailyProductSaleResponse>, sqlx::Error>;
+
+    async fn get_daily_total_sales_revenue(
+        &self,
+        date: NaiveDate,
+    ) -> Result<f64, sqlx::Error>;
 }
 #[async_trait]
 impl SalesExt for DBClient {
@@ -516,29 +521,48 @@ impl SalesExt for DBClient {
     }
 
    async fn get_daily_product_sales(
-    &self,
-    date: NaiveDate,
-) -> Result<Vec<DailyProductSaleResponse>, sqlx::Error> {
-    let sales = sqlx::query_as::<_, DailyProductSaleResponse>(
-        r#"
-        SELECT 
-            p.name AS product_name,
-            SUM(sp.quantity) AS total_quantity,
-            SUM(sp.quantity * p.price) AS total_amount
-        FROM sales s
-        JOIN sales_product sp ON s.salesid = sp.salesid
-        JOIN products p ON sp.productid = p.id
-        WHERE s.date = $1
-        GROUP BY p.name
-        ORDER BY total_quantity DESC
-        "#
-    )
-    .bind(date)
-    .fetch_all(&self.pool)
-    .await?;
+        &self,
+        date: NaiveDate,
+    ) -> Result<Vec<DailyProductSaleResponse>, sqlx::Error> {
+        let sales = sqlx::query_as::<_, DailyProductSaleResponse>(
+            r#"
+            SELECT 
+                p.name AS product_name,
+                SUM(sp.quantity) AS total_quantity,
+                SUM(sp.quantity * p.price) AS total_amount
+            FROM sales s
+            JOIN sales_product sp ON s.salesid = sp.salesid
+            JOIN products p ON sp.productid = p.id
+            WHERE s.date = $1
+            GROUP BY p.name
+            ORDER BY total_quantity DESC
+            "#
+        )
+        .bind(date)
+        .fetch_all(&self.pool)
+        .await?;
 
-    Ok(sales)
-}
+        Ok(sales)
+    }
+
+    async fn get_daily_total_sales_revenue(
+        &self,
+        date: NaiveDate,
+    ) -> Result<f64, sqlx::Error> {
+        let total_revenue: f64 = sqlx::query_scalar(
+            r#"
+            SELECT COALESCE(SUM(paid_amount), 0)
+            FROM sales
+            WHERE date = $1
+            "#
+        )
+        .bind(date)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(total_revenue)
+    }
+
 
 }
 

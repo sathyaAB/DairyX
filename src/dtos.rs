@@ -276,3 +276,9 @@ pub struct DailyProductSaleListResponse {
     pub results: usize,
     pub sales: Vec<DailyProductSaleResponse>,
 }
+
+#[derive(Debug, Serialize)]
+pub struct DailySalesRevenueResponse {
+    pub date: NaiveDate,
+    pub total_revenue: f64,
+}
