@@ -4,19 +4,20 @@ use axum::{
     Json,
 };
 use std::sync::Arc;
-use crate::dtos::{CreateSaleRequest, CreateSaleResponse};
+use crate::dtos::{CreateSaleRequest, CreateSaleResponse, DailyProductSaleRequest, DailyProductSaleListResponse};
 use crate::error::{HttpError, ErrorMessage};
 use crate::db::{SalesExt};
 use crate::models::UserRole;
 use crate::middleware::JWTAuthMiddeware;
 use crate::AppState;
-use axum::routing::post;
+use axum::routing::{get,post};
 use axum::Router;
 use uuid::Uuid;
 
 pub fn sales_handler() -> Router {
     Router::new()
         .route("/create", post(create_sale))
+        .route("/daily-product-sales", get(get_daily_product_sales))
 }
 
 pub async fn create_sale(
@@ -52,5 +53,21 @@ pub async fn create_sale(
     Ok(Json(CreateSaleResponse {
         salesid: sale.salesid,
         message: "Sale recorded successfully".to_string(),
+    }))
+}
+
+pub async fn get_daily_product_sales(
+    Extension(app_state): Extension<Arc<AppState>>,
+    Json(body): Json<DailyProductSaleRequest>,
+) -> Result<Json<DailyProductSaleListResponse>, HttpError> {
+    let sales = app_state.db_client
+        .get_daily_product_sales(body.date)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    Ok(Json(DailyProductSaleListResponse {
+        status: "success".to_string(),
+        results: sales.len(),
+        sales,
     }))
 }

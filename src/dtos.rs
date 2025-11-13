@@ -1,6 +1,7 @@
 use core::str;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
+use sqlx::prelude::FromRow;
 use validator::Validate;
 use uuid::Uuid;
 use crate::models::{User, UserRole, Product, Delivery, TruckLoad};
@@ -254,4 +255,24 @@ pub struct CreateTruckAllowanceRequest {
 pub struct CreateTruckAllowanceResponse {
     pub truck_allowance_id: Uuid,
     pub message: String,
+}
+
+
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct DailyProductSaleRequest {
+    pub date: NaiveDate, // the date for which totals are requested
+}
+
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct DailyProductSaleResponse {
+    pub product_name: String,
+    pub total_quantity: i64,
+    pub total_amount: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DailyProductSaleListResponse {
+    pub status: String,
+    pub results: usize,
+    pub sales: Vec<DailyProductSaleResponse>,
 }
