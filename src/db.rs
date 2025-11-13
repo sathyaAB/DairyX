@@ -13,6 +13,8 @@ use crate::dtos::TruckAllowanceInfo;
 use crate::dtos::PendingPaymentResponse;
 use crate::dtos::AllowanceDistributionRequest;
 use crate::dtos::UpdateTruckLoadQuantityResponse;
+use sqlx::Error as SqlxError;
+
 
 #[derive(Debug, Clone)]
 pub struct DBClient {
@@ -790,18 +792,33 @@ impl AllowanceExt for DBClient {
         Ok(allowance)
     }
 
-   async fn create_truck_allowance(
+
+    async fn create_truck_allowance(
         &self,
         allowanceid: Uuid,
         truckid: Uuid,
         amount: f64,
-    ) -> Result<TruckAllowance, sqlx::Error> {
-        let mut tx: Transaction<'_, Postgres> = self.pool.begin().await?;
+    ) -> Result<TruckAllowance, SqlxError> {
+        let mut tx = self.pool.begin().await?;
+
+        // ✅ First, get truck’s max_allowance
+        let max_allowance: f64 = sqlx::query_scalar(
+            "SELECT max_allowance FROM trucks WHERE truckid = $1"
+        )
+        .bind(truckid)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        // ✅ Compare before inserting
+        if amount > max_allowance {
+            return Err(SqlxError::Protocol(format!("Allowance exceeds truck max limit").into()));
+
+        }
 
         let truck_allowance = sqlx::query_as::<_, TruckAllowance>(
             "INSERT INTO truck_allowance (allowanceid, truckid, amount, created_at, updated_at)
-             VALUES ($1, $2, $3, NOW(), NOW())
-             RETURNING *"
+            VALUES ($1, $2, $3, NOW(), NOW())
+            RETURNING *"
         )
         .bind(allowanceid)
         .bind(truckid)
@@ -812,6 +829,7 @@ impl AllowanceExt for DBClient {
         tx.commit().await?;
         Ok(truck_allowance)
     }
+
 
     async fn get_allowance_distribution_by_date(
         &self,
