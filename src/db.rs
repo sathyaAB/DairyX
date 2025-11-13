@@ -462,6 +462,11 @@ pub trait SalesExt {
         &self,
         date: NaiveDate,
     ) -> Result<f64, sqlx::Error>;
+
+    async fn get_daily_commission(
+        &self,
+        date: NaiveDate,
+    ) -> Result<f64, sqlx::Error>;
 }
 #[async_trait]
 impl SalesExt for DBClient {
@@ -561,6 +566,28 @@ impl SalesExt for DBClient {
         .await?;
 
         Ok(total_revenue)
+    }
+
+
+    async fn get_daily_commission(
+        &self,
+        date: NaiveDate,
+    ) -> Result<f64, sqlx::Error> {
+        let total_commission: Option<f64> = sqlx::query_scalar(
+            r#"
+            SELECT 
+                SUM(sp.quantity * p.commission) AS total_commission
+            FROM sales s
+            JOIN sales_product sp ON s.salesid = sp.salesid
+            JOIN products p ON sp.productid = p.id
+            WHERE s.date = $1
+            "#,
+        )
+        .bind(date)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(total_commission.unwrap_or(0.0))
     }
 
 

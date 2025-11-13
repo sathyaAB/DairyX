@@ -4,7 +4,7 @@ use axum::{
     Json,
 };
 use std::sync::Arc;
-use crate::dtos::{CreateSaleRequest, CreateSaleResponse, DailyProductSaleRequest, DailyProductSaleListResponse, DailySalesRevenueResponse};
+use crate::dtos::{CreateSaleRequest, CreateSaleResponse, DailyProductSaleRequest, DailyProductSaleListResponse, DailySalesRevenueResponse, DailyCommissionRequest, DailyCommissionResponse};
 use crate::error::{HttpError, ErrorMessage};
 use crate::db::{SalesExt};
 use crate::models::UserRole;
@@ -19,6 +19,7 @@ pub fn sales_handler() -> Router {
         .route("/create", post(create_sale))
         .route("/daily-product-sales", get(get_daily_product_sales))
         .route("/daily-sales-revenue", get(get_daily_sales_revenue))
+        .route("/daily-commission", get(get_daily_commission))
 }
 
 pub async fn create_sale(
@@ -87,4 +88,21 @@ pub async fn get_daily_sales_revenue(
         total_revenue,
     }))
 }
+
+
+pub async fn get_daily_commission(
+    Extension(app_state): Extension<Arc<AppState>>,
+    Json(body): Json<DailyCommissionRequest>,
+) -> Result<Json<DailyCommissionResponse>, HttpError> {
+    let total_commission = app_state.db_client
+        .get_daily_commission(body.date)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    Ok(Json(DailyCommissionResponse {
+        date: body.date,
+        total_commission,
+    }))
+}
+
 

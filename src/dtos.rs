@@ -282,3 +282,14 @@ pub struct DailySalesRevenueResponse {
     pub date: NaiveDate,
     pub total_revenue: f64,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct DailyCommissionRequest {
+    pub date: NaiveDate,
+}
+
+#[derive(Debug, Serialize)]
+pub struct DailyCommissionResponse {
+    pub date: NaiveDate,
+    pub total_commission: f64,
+}
