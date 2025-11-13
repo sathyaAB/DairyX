@@ -4,18 +4,19 @@ use axum::{
     Json,
 };
 use std::sync::Arc;
-use crate::dtos::{CreateAllowanceRequest, CreateAllowanceResponse, CreateTruckAllowanceRequest, CreateTruckAllowanceResponse};
+use crate::dtos::{CreateAllowanceRequest, CreateAllowanceResponse, CreateTruckAllowanceRequest, CreateTruckAllowanceResponse, AllowanceDistributionRequest, AllowanceDistributionResponse};
 use crate::error::{HttpError, ErrorMessage};
 use crate::db::AllowanceExt;
 use crate::middleware::JWTAuthMiddeware;
 use crate::AppState;
-use axum::routing::post;
+use axum::routing::{get,post};
 use axum::Router;
 
 pub fn allowance_handler() -> Router {
     Router::new()
         .route("/create", post(create_allowance))
         .route("/truck-create", post(create_truck_allowance))
+        .route("/distribution", get(get_allowance_distribution))
 }
 
 pub async fn create_allowance(
@@ -65,4 +66,16 @@ pub async fn create_truck_allowance(
         truck_allowance_id: truck_allowance.id,
         message: "Truck allowance created successfully".to_string(),
     }))
+}
+
+pub async fn get_allowance_distribution(
+    Extension(app_state): Extension<Arc<AppState>>,
+    Json(body): Json<AllowanceDistributionRequest>,
+) -> Result<Json<AllowanceDistributionResponse>, HttpError> {
+    let distribution = app_state.db_client
+        .get_allowance_distribution_by_date(body.date)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    Ok(Json(distribution))
 }

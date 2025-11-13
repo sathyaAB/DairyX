@@ -293,3 +293,23 @@ pub struct DailyCommissionResponse {
     pub date: NaiveDate,
     pub total_commission: f64,
 }
+
+
+#[derive(Debug, Deserialize)]
+pub struct AllowanceDistributionRequest {
+    pub date: NaiveDate,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TruckAllowanceInfo {
+    pub trucknumber: String,
+    pub amount: f64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AllowanceDistributionResponse {
+    pub date: NaiveDate,
+    pub total_amount: f64,
+    pub distributed: Vec<TruckAllowanceInfo>,
+}
+

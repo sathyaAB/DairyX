@@ -8,6 +8,8 @@ use crate::models::{User, UserRole, Product, TruckLoad, Sale, Payment, Allowance
 use crate::models::{Delivery};
 use sqlx::Executor; 
 use crate::dtos::DailyProductSaleResponse;
+use crate::dtos::AllowanceDistributionResponse;
+use crate::dtos::TruckAllowanceInfo;
 
 
 #[derive(Debug, Clone)]
@@ -591,6 +593,8 @@ impl SalesExt for DBClient {
     }
 
 
+
+
 }
 
 
@@ -677,7 +681,13 @@ pub trait AllowanceExt {
         truckid: Uuid,
         amount: f64,
     ) -> Result<TruckAllowance, sqlx::Error>;
+
+    async fn get_allowance_distribution_by_date(
+        &self,
+        date: chrono::NaiveDate,
+    ) -> Result<AllowanceDistributionResponse, sqlx::Error>;
 }
+  
 
 #[async_trait]
 impl AllowanceExt for DBClient {
@@ -727,5 +737,43 @@ impl AllowanceExt for DBClient {
         tx.commit().await?;
         Ok(truck_allowance)
     }
+
+    async fn get_allowance_distribution_by_date(
+        &self,
+        date: chrono::NaiveDate,
+    ) -> Result<AllowanceDistributionResponse, sqlx::Error> {
+        // Get the allowance record for the given date
+        let row = sqlx::query!(
+            "SELECT allowanceid, amount FROM allowance WHERE date = $1",
+            date
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        let allowanceid = row.allowanceid;
+        let total_amount = row.amount;
+
+        // Get truck allocations
+        let distributed: Vec<TruckAllowanceInfo> = sqlx::query_as!(
+            TruckAllowanceInfo,
+            r#"
+            SELECT t.trucknumber, ta.amount
+            FROM truck_allowance ta
+            JOIN trucks t ON ta.truckid = t.truckid
+            WHERE ta.allowanceid = $1
+            ORDER BY t.trucknumber
+            "#,
+            allowanceid
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(AllowanceDistributionResponse {
+            date,
+            total_amount,
+            distributed,
+        })
+    }
+
 
 }
