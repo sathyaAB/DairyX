@@ -881,6 +881,12 @@ pub trait TruckExt {
     ) -> Result<Truck, sqlx::Error>;
 
     async fn get_all_trucks(&self) -> Result<Vec<Truck>, sqlx::Error>;
+
+    async fn update_max_allowance(
+        &self,
+        trucknumber: &str,
+        max_allowance: f64,
+    ) -> Result<Truck, sqlx::Error>;
 }
 
 #[async_trait]
@@ -918,5 +924,26 @@ impl TruckExt for DBClient {
         .await?;
 
         Ok(trucks)
+    }
+
+    async fn update_max_allowance(
+        &self,
+        trucknumber: &str,
+        max_allowance: f64,
+    ) -> Result<Truck, sqlx::Error> {
+        let updated_truck = sqlx::query_as::<_, Truck>(
+            r#"
+            UPDATE trucks
+            SET max_allowance = $1, updated_at = NOW()
+            WHERE trucknumber = $2
+            RETURNING *
+            "#
+        )
+        .bind(max_allowance)
+        .bind(trucknumber)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(updated_truck)
     }
 }

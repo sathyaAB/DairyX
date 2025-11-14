@@ -358,3 +358,16 @@ pub struct TruckData {
     pub trucknumber: String,
     pub model: String,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateTruckMaxAllowanceRequest {
+    pub trucknumber: String,
+    pub max_allowance: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateTruckMaxAllowanceResponse {
+    pub truckid: uuid::Uuid,
+    pub trucknumber: String,
+    pub max_allowance: f64,
+}
