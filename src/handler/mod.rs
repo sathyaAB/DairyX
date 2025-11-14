@@ -6,3 +6,4 @@ pub mod truck_load;
 pub mod sales;
 pub mod payment;
 pub mod allowance;
+pub mod trucks;

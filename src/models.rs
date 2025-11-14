@@ -80,7 +80,9 @@ pub struct Truck {
     pub truckid: uuid::Uuid,
     pub trucknumber: String,
     pub model: String,
+    pub max_allowance: Option<f64>,
 }
+
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
 pub struct TruckLoad {

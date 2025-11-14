@@ -3,7 +3,7 @@ use chrono::{ NaiveDate};
 use sqlx::{Pool, Postgres, Transaction};
 use uuid::Uuid;
 
-use crate::models::{User, UserRole, Product, TruckLoad, Sale, Payment, Allowance, TruckAllowance};
+use crate::models::{User, UserRole, Product, TruckLoad, Sale, Payment, Allowance, TruckAllowance, Truck};
 
 use crate::models::{Delivery};
 use sqlx::Executor; 
@@ -869,4 +869,54 @@ impl AllowanceExt for DBClient {
     }
 
 
+}
+
+#[async_trait]
+pub trait TruckExt {
+    async fn create_truck(
+        &self,
+        trucknumber: &str,
+        model: &str,
+        max_allowance: Option<f64>,
+    ) -> Result<Truck, sqlx::Error>;
+
+    async fn get_all_trucks(&self) -> Result<Vec<Truck>, sqlx::Error>;
+}
+
+#[async_trait]
+impl TruckExt for DBClient {
+    async fn create_truck(
+        &self,
+        trucknumber: &str,
+        model: &str,
+        max_allowance: Option<f64>,
+    ) -> Result<Truck, sqlx::Error> {
+        let mut tx = self.pool.begin().await?;
+
+        let truck = sqlx::query_as::<_, Truck>(
+            r#"
+            INSERT INTO trucks (trucknumber, model, max_allowance, created_at, updated_at)
+            VALUES ($1, $2, $3, NOW(), NOW())
+            RETURNING *
+            "#
+        )
+        .bind(trucknumber)
+        .bind(model)
+        .bind(max_allowance)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+        Ok(truck)
+    }
+
+    async fn get_all_trucks(&self) -> Result<Vec<Truck>, sqlx::Error> {
+        let trucks = sqlx::query_as::<_, Truck>(
+            "SELECT * FROM trucks ORDER BY created_at DESC"
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(trucks)
+    }
 }

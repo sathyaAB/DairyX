@@ -337,3 +337,24 @@ pub struct UpdateTruckLoadQuantityResponse {
     pub remaining_quantity: i32,
 }
 
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateTruckRequest {
+    pub trucknumber: String,
+    pub model: String,
+    pub max_allowance: Option<f64>, // optional, can default to 4000 in backend if not provided
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateTruckResponse {
+    pub truckid: uuid::Uuid,
+    pub message: String,
+}
+
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TruckData {
+    pub truckid: uuid::Uuid,
+    pub trucknumber: String,
+    pub model: String,
+}
