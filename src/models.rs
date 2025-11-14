@@ -163,3 +163,5 @@ pub struct TruckAllowance {
     pub created_at: Option<NaiveDateTime>,
     pub updated_at: Option<NaiveDateTime>,
 }
+
+

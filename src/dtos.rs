@@ -371,3 +371,18 @@ pub struct UpdateTruckMaxAllowanceResponse {
     pub trucknumber: String,
     pub max_allowance: f64,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateShopRequest {
+    pub name: String,
+    pub address: String,
+    pub city: Option<String>,
+    pub district: Option<String>,
+    pub contact_number: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateShopResponse {
+    pub shopid: uuid::Uuid,
+    pub message: String,
+}

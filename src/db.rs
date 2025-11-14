@@ -3,7 +3,7 @@ use chrono::{ NaiveDate};
 use sqlx::{Pool, Postgres, Transaction};
 use uuid::Uuid;
 
-use crate::models::{User, UserRole, Product, TruckLoad, Sale, Payment, Allowance, TruckAllowance, Truck};
+use crate::models::{User, UserRole, Product, TruckLoad, Sale, Payment, Allowance, TruckAllowance, Truck, Shop};
 
 use crate::models::{Delivery};
 use sqlx::Executor; 
@@ -947,3 +947,62 @@ impl TruckExt for DBClient {
         Ok(updated_truck)
     }
 }
+
+
+#[async_trait]
+pub trait ShopExt {
+    async fn create_shop(
+        &self,
+        name: &str,
+        address: &str,
+        city: Option<&str>,
+        district: Option<&str>,
+        contact_number: Option<&str>,
+    ) -> Result<Shop, sqlx::Error>;
+
+    async fn get_all_shops(&self) -> Result<Vec<Shop>, sqlx::Error>;
+
+   
+}
+
+#[async_trait]
+impl ShopExt for DBClient {
+    async fn create_shop(
+        &self,
+        name: &str,
+        address: &str,
+        city: Option<&str>,
+        district: Option<&str>,
+        contact_number: Option<&str>,
+    ) -> Result<Shop, sqlx::Error> {
+        let shop = sqlx::query_as::<_, Shop>(
+            r#"
+            INSERT INTO shops (name, address, city, district, contact_number, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+            RETURNING *
+            "#
+        )
+        .bind(name)
+        .bind(address)
+        .bind(city)
+        .bind(district)
+        .bind(contact_number)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(shop)
+    }
+
+    async fn get_all_shops(&self) -> Result<Vec<Shop>, sqlx::Error> {
+        let shops = sqlx::query_as::<_, Shop>(
+            "SELECT * FROM shops ORDER BY created_at DESC"
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(shops)
+    }
+
+
+}
+

@@ -7,3 +7,4 @@ pub mod sales;
 pub mod payment;
 pub mod allowance;
 pub mod trucks;
+pub mod shops;
