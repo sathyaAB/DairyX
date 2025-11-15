@@ -6,13 +6,10 @@ use uuid::Uuid;
 use crate::models::{User, UserRole, Product, TruckLoad, Sale, Payment, Allowance, TruckAllowance, Truck, Shop};
 
 use crate::models::{Delivery};
-use sqlx::Executor; 
 use crate::dtos::DailyProductSaleResponse;
 use crate::dtos::AllowanceDistributionResponse;
 use crate::dtos::TruckAllowanceInfo;
 use crate::dtos::PendingPaymentResponse;
-use crate::dtos::AllowanceDistributionRequest;
-use crate::dtos::UpdateTruckLoadQuantityResponse;
 use sqlx::Error as SqlxError;
 
 
@@ -269,10 +266,11 @@ pub trait DeliveryExt {
         &self,
         user_id: Uuid,
         date: NaiveDate,
-        products: Vec<(Uuid, i32)>, // (product_id, quantity)
+        products: Vec<(Uuid, i32)>, 
     ) -> Result<Delivery, sqlx::Error>;
 
     async fn get_deliveries_by_user(&self, user_id: Uuid) -> Result<Vec<Delivery>, sqlx::Error>;
+    async fn get_all_deliveries(&self) -> Result<Vec<Delivery>, sqlx::Error>;
 
 }
 #[async_trait]
@@ -357,6 +355,19 @@ impl DeliveryExt for DBClient {
     Ok(deliveries)
 }
 
+     async fn get_all_deliveries(&self) -> Result<Vec<Delivery>, sqlx::Error> {
+        let deliveries = sqlx::query_as::<_, Delivery>(
+            r#"
+            SELECT * FROM deliveries
+            ORDER BY date DESC
+            "#
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(deliveries)
+    }
+
 }
 
 #[async_trait]
@@ -366,7 +377,7 @@ pub trait TruckLoadExt {
         user_id: Uuid,
         truck_id: Uuid,
         date: NaiveDate,
-        products: Vec<(Uuid, i32)>, // (product_id, quantity)
+        products: Vec<(Uuid, i32)>, 
     ) -> Result<TruckLoad, sqlx::Error>;
 
     async fn get_all_truck_loads(&self) -> Result<Vec<TruckLoad>, sqlx::Error>;
@@ -459,7 +470,7 @@ impl TruckLoadExt for DBClient {
         truckloadid: Uuid,
         productid: Uuid,
         remaining_quantity: i32,
-    ) -> Result<(Uuid, Uuid, i32), sqlx::Error> { // returns (truckloadid, productid, remaining_quantity)
+    ) -> Result<(Uuid, Uuid, i32), sqlx::Error> { 
         let mut tx: Transaction<'_, Postgres> = self.pool.begin().await?;
 
         // 1. Decrease remaining_quantity in truck_load_products
@@ -505,7 +516,7 @@ pub trait SalesExt {
         truckload_id: Uuid,
         shop_id: Uuid,
         date: NaiveDate,
-        products: Vec<(Uuid, i32)>, // (product_id, quantity)
+        products: Vec<(Uuid, i32)>, 
     ) -> Result<Sale, sqlx::Error>;
 
     async fn get_daily_product_sales(

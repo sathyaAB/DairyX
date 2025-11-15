@@ -1,7 +1,6 @@
 use chrono::prelude::*;
 use serde::{Deserialize, Serialize};
 use chrono::NaiveDate;
-use rust_decimal::Decimal;
 
 #[derive(Debug, Deserialize, Serialize, Clone, Copy, sqlx::Type, PartialEq)]
 #[sqlx(type_name = "user_role", rename_all = "lowercase")]
@@ -60,20 +59,20 @@ pub struct Delivery {
 }
 
 
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
-pub struct DeliveryProduct {
-    pub deliveryid: uuid::Uuid,
-    pub productid: uuid::Uuid,
-    pub quantity: i32,
-}
+// #[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
+// pub struct DeliveryProduct {
+//     pub deliveryid: uuid::Uuid,
+//     pub productid: uuid::Uuid,
+//     pub quantity: i32,
+// }
 
 
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
-pub struct WarehouseStock {
-    pub stockid: uuid::Uuid,
-    pub productid: uuid::Uuid,
-    pub quantity: i32,
-}
+// #[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
+// pub struct WarehouseStock {
+//     pub stockid: uuid::Uuid,
+//     pub productid: uuid::Uuid,
+//     pub quantity: i32,
+// }
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
 pub struct Truck {
@@ -94,12 +93,12 @@ pub struct TruckLoad {
     pub updated_at: Option<chrono::NaiveDateTime>,
 }
 
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
-pub struct TruckLoadProduct {
-    pub truckloadid: uuid::Uuid,
-    pub productid: uuid::Uuid,
-    pub quantity: i32,
-}
+// #[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
+// pub struct TruckLoadProduct {
+//     pub truckloadid: uuid::Uuid,
+//     pub productid: uuid::Uuid,
+//     pub quantity: i32,
+// }
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
 pub struct Shop {
@@ -126,12 +125,12 @@ pub struct Sale {
     pub updated_at: Option<NaiveDateTime>,
 }
 
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
-pub struct SaleProduct {
-    pub salesid: uuid::Uuid,
-    pub productid: uuid::Uuid,
-    pub quantity: i32,
-}
+// #[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
+// pub struct SaleProduct {
+//     pub salesid: uuid::Uuid,
+//     pub productid: uuid::Uuid,
+//     pub quantity: i32,
+// }
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
 pub struct Payment {

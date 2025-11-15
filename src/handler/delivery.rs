@@ -18,6 +18,9 @@ pub fn delivery_handler() -> Router {
     Router::new()
         .route("/create", post(create_delivery))
         .route("/history", get(get_delivery_history))
+        .route("/all", get(get_all_delivery_history))
+
+
 }
 
 pub async fn create_delivery(
@@ -25,8 +28,8 @@ pub async fn create_delivery(
     Extension(app_state): Extension<Arc<AppState>>,    
     Json(body): Json<CreateDeliveryDto>,
 ) -> Result<Json<DeliveryResponseDto>, HttpError> {
-    // Check if user has Manager or Admin role
-    if jwt_auth.user.role != UserRole::Manager && jwt_auth.user.role != UserRole::Admin {
+    // Check if user has Manager 
+    if jwt_auth.user.role != UserRole::Manager {
         return Err(HttpError::new(
             ErrorMessage::PermissionDenied.to_string(),
             StatusCode::FORBIDDEN,
@@ -68,6 +71,32 @@ pub async fn get_delivery_history(
     // Fetch all deliveries for the logged-in user
     let deliveries = app_state.db_client
         .get_deliveries_by_user(user_id)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    Ok(Json(DeliveryListResponseDto {
+        status: "success".to_string(),
+        deliveries,
+    }))
+}
+
+pub async fn get_all_delivery_history(
+    Extension(jwt_auth): Extension<JWTAuthMiddeware>,
+    Extension(app_state): Extension<Arc<AppState>>,
+) -> Result<Json<DeliveryListResponseDto>, HttpError> {
+    // Only Admin or Manager should be able to see full history
+    if jwt_auth.user.role != crate::models::UserRole::Admin
+        && jwt_auth.user.role != crate::models::UserRole::Manager
+    {
+        return Err(HttpError::new(
+            ErrorMessage::PermissionDenied.to_string(),
+            StatusCode::FORBIDDEN,
+        ));
+    }
+
+    // Fetch all deliveries
+    let deliveries = app_state.db_client
+        .get_all_deliveries()
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 

@@ -1,13 +1,13 @@
 use core::str;
-use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::prelude::FromRow;
 use validator::Validate;
 use uuid::Uuid;
-use crate::models::{User, UserRole, Product, Delivery, TruckLoad};
+use crate::models::{User, UserRole, Product, Delivery};
 
 
-
+// Registration, login, user filtering & user responses.
 #[derive(Validate, Debug, Default, Clone, Serialize, Deserialize)]
 pub struct RegisterUserDto {
     #[validate(length(min = 1, message = "First name is required"))]
@@ -84,16 +84,16 @@ impl FilterUserDto {
 }
 
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct UserData {
-    pub user: FilterUserDto,
-}
+// #[derive(Debug, Serialize, Deserialize)]
+// pub struct UserData {
+//     pub user: FilterUserDto,
+// }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct UserResponseDto {
-    pub status: String,
-    pub data: UserData,
-}
+// #[derive(Debug, Serialize, Deserialize)]
+// pub struct UserResponseDto {
+//     pub status: String,
+//     pub data: UserData,
+// }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UserListResponseDto {
@@ -113,6 +113,7 @@ pub struct Response {
     pub status: &'static str,
     pub message: String,
 }
+// Product creation and product list responses.
 
 #[derive(Debug, serde::Deserialize)]
 pub struct CreateProductDto {
@@ -135,9 +136,10 @@ pub struct ProductsListResponseDto {
     pub products: Vec<Product>,
 }
 
+// Delivery creation and delivery list responses.
 #[derive(Debug, Deserialize)] 
 pub struct CreateDeliveryDto {
-    pub date: String, // or chrono::NaiveDate
+    pub date: String,
     pub products: Vec<DeliveryProductDto>,
 }
 
@@ -153,40 +155,41 @@ pub struct DeliveryResponseDto {
     pub delivery: Delivery,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct DeliveriesListResponseDto {
-    pub status: String,
-    pub deliveries: Vec<Delivery>,
-}
+// #[derive(Debug, Serialize, Deserialize)]
+// pub struct DeliveriesListResponseDto {
+//     pub status: String,
+//     pub deliveries: Vec<Delivery>,
+// }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DeliveryListResponseDto {
     pub status: String,
     pub deliveries: Vec<Delivery>,
 }
 
-
+// Creating truck loads and adding products to a load.
 #[derive(Debug, Deserialize)]
 pub struct CreateTruckLoadRequest {
-    pub truck_id: Uuid,                // Truck being used
-    pub driver_id: Uuid,               // Driver assigned for the truck load
-    pub date: NaiveDate,              // Date of the load
+    pub truck_id: Uuid,              
+    pub driver_id: Uuid,               
+    pub date: NaiveDate,              
     pub products: Vec<TruckLoadProductItem>,
 }
 
 
 #[derive(Debug, Deserialize)]
 pub struct TruckLoadProductItem {
-    pub product_id: Uuid,              // product id (Uuid)
+    pub product_id: Uuid,              
     pub quantity: i32,
 }
 
 #[derive(Debug, Serialize)]
 pub struct CreateTruckLoadResponse {
     pub truckloadid: Uuid,    
-    pub driver_id: Uuid,               // Driver assigned for the truck load
+    pub driver_id: Uuid,               
     pub message: String,
 }
 
+// Creating sales and sale product items.
 
 #[derive(Debug, Deserialize)]
 pub struct SaleProductItem {
@@ -196,8 +199,8 @@ pub struct SaleProductItem {
 
 #[derive(Debug, Deserialize)]
 pub struct CreateSaleRequest {
-    pub truckload_id: Uuid,  // TruckLoad delivering the products
-    pub shop_id: Uuid,       // Shop receiving the sale
+    pub truckload_id: Uuid,  
+    pub shop_id: Uuid,      
     pub date: NaiveDate,
     pub products: Vec<SaleProductItem>,
 }
@@ -216,13 +219,14 @@ pub struct CreatePaymentRequest {
     pub date: NaiveDate,
 }
 
+// Recording payments and payment responses.
 #[derive(Debug, Serialize)]
 pub struct CreatePaymentResponse {
     pub paymentid: Uuid,
     pub message: String,
 }
 
-
+// Allowances, truck allowances, and distribution data.
 #[derive(Debug, Deserialize)]
 pub struct CreateAllowanceRequest {
     pub date: NaiveDate,
@@ -236,13 +240,13 @@ pub struct CreateAllowanceResponse {
     pub message: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AllowanceResponse {
-    pub allowanceid: Uuid,
-    pub date: NaiveDate,
-    pub amount: f64,
-    pub created_at: Option<NaiveDateTime>,
-}
+// #[derive(Debug, Serialize, Deserialize)]
+// pub struct AllowanceResponse {
+//     pub allowanceid: Uuid,
+//     pub date: NaiveDate,
+//     pub amount: f64,
+//     pub created_at: Option<NaiveDateTime>,
+// }
 
 #[derive(Debug, Deserialize)]
 pub struct CreateTruckAllowanceRequest {
@@ -257,10 +261,11 @@ pub struct CreateTruckAllowanceResponse {
     pub message: String,
 }
 
+// Daily sales, revenue, and commission reports.
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct DailyProductSaleRequest {
-    pub date: NaiveDate, // the date for which totals are requested
+    pub date: NaiveDate, 
 }
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
@@ -294,11 +299,12 @@ pub struct DailyCommissionResponse {
     pub total_commission: f64,
 }
 
-
+// Allowances, truck allowances, and distribution data.
 #[derive(Debug, Deserialize)]
 pub struct AllowanceDistributionRequest {
     pub date: NaiveDate,
 }
+
 
 #[derive(Debug, Serialize)]
 pub struct TruckAllowanceInfo {
@@ -322,7 +328,7 @@ pub struct PendingPaymentResponse {
     pub shop_name: String,
     pub shop_address: String,
 }
-
+// Creating trucks and updating max allowance.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UpdateTruckLoadQuantityRequest {
     pub truckloadid: Uuid,
@@ -342,7 +348,7 @@ pub struct UpdateTruckLoadQuantityResponse {
 pub struct CreateTruckRequest {
     pub trucknumber: String,
     pub model: String,
-    pub max_allowance: Option<f64>, // optional, can default to 4000 in backend if not provided
+    pub max_allowance: Option<f64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -352,12 +358,12 @@ pub struct CreateTruckResponse {
 }
 
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TruckData {
-    pub truckid: uuid::Uuid,
-    pub trucknumber: String,
-    pub model: String,
-}
+// #[derive(Debug, Serialize, Deserialize)]
+// pub struct TruckData {
+//     pub truckid: uuid::Uuid,
+//     pub trucknumber: String,
+//     pub model: String,
+// }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UpdateTruckMaxAllowanceRequest {
@@ -371,6 +377,8 @@ pub struct UpdateTruckMaxAllowanceResponse {
     pub trucknumber: String,
     pub max_allowance: f64,
 }
+
+// Creating shop records.
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateShopRequest {

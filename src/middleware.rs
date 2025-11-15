@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::{
     extract::Request,
-    http::{header, StatusCode},
+    http::{header},
     middleware::Next,
     response::IntoResponse,
     Extension
@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     db::UserExt,
     error::{ErrorMessage, HttpError},
-    models::{User, UserRole},
+    models::{User},
     utils::token,
     AppState
 };
@@ -82,22 +82,22 @@ pub async fn auth(
 }
 
 
-pub async fn role_check(
-    Extension(_app_state): Extension<Arc<AppState>>,
-    req: Request,
-    next: Next,
-    required_roles: Vec<UserRole>,
-) -> Result<impl IntoResponse, HttpError> {
-    let user = req
-            .extensions()
-            .get::<JWTAuthMiddeware>()
-            .ok_or_else(|| {
-                HttpError::unauthorized(ErrorMessage::UserNotAuthenticated.to_string())
-            })?;
+// pub async fn role_check(
+//     Extension(_app_state): Extension<Arc<AppState>>,
+//     req: Request,
+//     next: Next,
+//     required_roles: Vec<UserRole>,
+// ) -> Result<impl IntoResponse, HttpError> {
+//     let user = req
+//             .extensions()
+//             .get::<JWTAuthMiddeware>()
+//             .ok_or_else(|| {
+//                 HttpError::unauthorized(ErrorMessage::UserNotAuthenticated.to_string())
+//             })?;
     
-    if !required_roles.contains(&user.user.role) {
-        return Err(HttpError::new(ErrorMessage::PermissionDenied.to_string(), StatusCode::FORBIDDEN));
-    }
+//     if !required_roles.contains(&user.user.role) {
+//         return Err(HttpError::new(ErrorMessage::PermissionDenied.to_string(), StatusCode::FORBIDDEN));
+//     }
 
-    Ok(next.run(req).await)
-}
+//     Ok(next.run(req).await)
+// }

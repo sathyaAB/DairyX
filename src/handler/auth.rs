@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use axum::{http::{ StatusCode}, response::{IntoResponse}, routing::{get, post}, Extension, Json, Router};
+use axum::{http::{ StatusCode}, response::{IntoResponse}, routing::{ post}, Extension, Json, Router};
 
 use validator::Validate;
 use crate::models::UserRole;
