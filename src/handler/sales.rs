@@ -133,7 +133,7 @@ pub async fn get_pending_payments(
     Extension(jwt_auth): Extension<JWTAuthMiddeware>,
     Extension(app_state): Extension<Arc<AppState>>,
 ) -> Result<Json<Vec<PendingPaymentResponse>>, HttpError> {
-    if jwt_auth.user.role != UserRole::Admin {
+    if jwt_auth.user.role != UserRole::Admin  && jwt_auth.user.role != crate::models::UserRole::Manager && jwt_auth.user.role != crate::models::UserRole::Driver{
         return Err(HttpError::new(
             ErrorMessage::PermissionDenied.to_string(),
             StatusCode::FORBIDDEN,

@@ -58,7 +58,7 @@ pub async fn create_truck_allowance(
         ));
     }
     let truck_allowance = app_state.db_client
-        .create_truck_allowance(body.allowanceid, body.truckid, body.amount)
+        .create_truck_allowance(body.truckid,body.date, body.amount)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 

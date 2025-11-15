@@ -267,8 +267,8 @@ pub struct CreateAllowanceResponse {
 
 #[derive(Debug, Deserialize)]
 pub struct CreateTruckAllowanceRequest {
-    pub allowanceid: Uuid,   
-    pub truckid: Uuid,       
+    pub truckid: Uuid,     
+    pub date: NaiveDate,  
     pub amount: f64,        
 }
 

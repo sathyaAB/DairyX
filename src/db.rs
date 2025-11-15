@@ -797,11 +797,12 @@ pub trait AllowanceExt {
         notes: Option<String>,
     ) -> Result<Allowance, sqlx::Error>;
     async fn create_truck_allowance(
-        &self,
-        allowanceid: Uuid,
-        truckid: Uuid,
-        amount: f64,
-    ) -> Result<TruckAllowance, sqlx::Error>;
+    &self,
+    truckid: Uuid,
+    date: NaiveDate,
+    amount: f64,
+) -> Result<TruckAllowance, sqlx::Error>;
+
 
     async fn get_allowance_distribution_by_date(
         &self,
@@ -838,41 +839,51 @@ impl AllowanceExt for DBClient {
 
 
     async fn create_truck_allowance(
-        &self,
-        allowanceid: Uuid,
-        truckid: Uuid,
-        amount: f64,
-    ) -> Result<TruckAllowance, SqlxError> {
-        let mut tx = self.pool.begin().await?;
+    &self,
+    truckid: Uuid,
+    date: NaiveDate,
+    amount: f64,
+) -> Result<TruckAllowance, SqlxError> {
+    let mut tx = self.pool.begin().await?;
 
-        // ✅ First, get truck’s max_allowance
-        let max_allowance: f64 = sqlx::query_scalar(
-            "SELECT max_allowance FROM trucks WHERE truckid = $1"
-        )
-        .bind(truckid)
-        .fetch_one(&mut *tx)
-        .await?;
+    // 1. Get truck max_allowance
+    let max_allowance: f64 = sqlx::query_scalar(
+        "SELECT max_allowance FROM trucks WHERE truckid = $1"
+    )
+    .bind(truckid)
+    .fetch_one(&mut *tx)
+    .await?;
 
-        // ✅ Compare before inserting
-        if amount > max_allowance {
-            return Err(SqlxError::Protocol(format!("Allowance exceeds truck max limit").into()));
-
-        }
-
-        let truck_allowance = sqlx::query_as::<_, TruckAllowance>(
-            "INSERT INTO truck_allowance (allowanceid, truckid, amount, created_at, updated_at)
-            VALUES ($1, $2, $3, NOW(), NOW())
-            RETURNING *"
-        )
-        .bind(allowanceid)
-        .bind(truckid)
-        .bind(amount)
-        .fetch_one(&mut *tx)
-        .await?;
-
-        tx.commit().await?;
-        Ok(truck_allowance)
+    if amount > max_allowance {
+        return Err(SqlxError::Protocol(
+            "Allowance exceeds truck max limit".into()
+        ));
     }
+
+    // 2. Get allowanceid from allowance table using date
+    let allowanceid: Uuid = sqlx::query_scalar(
+        "SELECT allowanceid FROM allowance WHERE date = $1"
+    )
+    .bind(date)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    // 3. Insert into truck_allowance
+    let truck_allowance = sqlx::query_as::<_, TruckAllowance>(
+        "INSERT INTO truck_allowance (allowanceid, truckid, amount, created_at, updated_at)
+         VALUES ($1, $2, $3, NOW(), NOW())
+         RETURNING *"
+    )
+    .bind(allowanceid)
+    .bind(truckid)
+    .bind(amount)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+    Ok(truck_allowance)
+}
+
 
 
     async fn get_allowance_distribution_by_date(
