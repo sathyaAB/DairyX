@@ -5,7 +5,7 @@ use axum::{
 };
 use std::sync::Arc;
 use crate::dtos::{CreateSaleRequest, CreateSaleResponse, DailyProductSaleRequest, DailyProductSaleListResponse, DailySalesRevenueResponse, DailyCommissionRequest, DailyCommissionResponse,
-                    PendingPaymentResponse};
+                    PendingPaymentResponse, GetAllSalesResponse, SaleDto};
 use crate::error::{HttpError, ErrorMessage};
 use crate::db::{SalesExt};
 use crate::models::UserRole;
@@ -22,6 +22,7 @@ pub fn sales_handler() -> Router {
         .route("/daily-sales-revenue", get(get_daily_sales_revenue))
         .route("/daily-commission", get(get_daily_commission))
         .route("/pending-payments", get(get_pending_payments))
+        .route("/all", get(get_all_sales))
 }
 
 pub async fn create_sale(
@@ -146,4 +147,35 @@ pub async fn get_pending_payments(
     Ok(Json(payments))
 }
 
+pub async fn get_all_sales(
+    Extension(jwt_auth): Extension<JWTAuthMiddeware>,
+    Extension(app_state): Extension<Arc<AppState>>,
+) -> Result<Json<GetAllSalesResponse>, HttpError> {
+    if jwt_auth.user.role != UserRole::Admin {
+        return Err(HttpError::new(
+            ErrorMessage::PermissionDenied.to_string(),
+            StatusCode::FORBIDDEN,
+        ));
+    }
+
+    let sales = app_state.db_client
+        .get_all_sales()
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    // Wrap the vector of SaleDto in GetAllSalesResponse
+    let response = GetAllSalesResponse {
+        sales: sales.into_iter().map(|r| SaleDto {
+            salesid: r.salesid,
+            truckload_id: r.truckload_id,
+            shop_id: r.shop_id,
+            date: r.date,
+            total_amount: r.total_amount,
+            paid_amount: r.paid_amount,
+            status: r.status,
+        }).collect(),
+    };
+
+    Ok(Json(response))
+}
 

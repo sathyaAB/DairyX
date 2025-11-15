@@ -219,6 +219,23 @@ pub struct CreatePaymentRequest {
     pub date: NaiveDate,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GetAllSalesResponse {
+    pub sales: Vec<SaleDto>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SaleDto {
+    pub salesid: Uuid,
+    pub truckload_id: Uuid,
+    pub shop_id: Uuid,
+    pub date: NaiveDate,
+    pub total_amount: f64,
+    pub paid_amount: f64,
+    pub status: String,
+}
+
+
 // Recording payments and payment responses.
 #[derive(Debug, Serialize)]
 pub struct CreatePaymentResponse {

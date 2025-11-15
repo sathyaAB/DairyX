@@ -10,6 +10,8 @@ use crate::dtos::DailyProductSaleResponse;
 use crate::dtos::AllowanceDistributionResponse;
 use crate::dtos::TruckAllowanceInfo;
 use crate::dtos::PendingPaymentResponse;
+use crate::dtos::SaleDto;
+
 use sqlx::Error as SqlxError;
 
 
@@ -542,6 +544,8 @@ pub trait SalesExt {
 
     async fn get_pending_payments(&self) -> Result<Vec<PendingPaymentResponse>, sqlx::Error>;
 
+    async fn get_all_sales(&self) -> Result<Vec<SaleDto>, sqlx::Error>;
+
 }
 #[async_trait]
 impl SalesExt for DBClient {
@@ -687,7 +691,30 @@ impl SalesExt for DBClient {
         Ok(payments)
     }
 
+    async fn get_all_sales(&self) -> Result<Vec<SaleDto>, sqlx::Error> {
+        let rows = sqlx::query!(
+            r#"
+            SELECT salesid, truckloadid, shopid, date, total_amount, paid_amount, status
+            FROM sales
+            ORDER BY date DESC
+            "#
+        )
+        .fetch_all(&self.pool)
+        .await?;
 
+        // Map SQL rows to DTO
+        let sales = rows.into_iter().map(|r| SaleDto {
+            salesid: r.salesid,
+            truckload_id: r.truckloadid,
+            shop_id: r.shopid,
+            date: r.date,
+            total_amount: r.total_amount.unwrap_or(0.0), 
+            paid_amount: r.paid_amount.unwrap_or(0.0), 
+            status: r.status,
+        }).collect();
+
+        Ok(sales)
+    }
 
 }
 
