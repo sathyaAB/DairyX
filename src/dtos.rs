@@ -329,19 +329,32 @@ pub struct PendingPaymentResponse {
     pub shop_address: String,
 }
 // Creating trucks and updating max allowance.
+
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UpdateTruckLoadQuantityRequest {
     pub truckloadid: Uuid,
+    pub items: Vec<TruckLoadQuantityItem>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TruckLoadQuantityItem {
     pub productid: Uuid,
-    pub remaining_quantity: i32, 
+    pub remaining_quantity: i32,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UpdateTruckLoadQuantityResponse {
     pub truckloadid: Uuid,
+    pub items: Vec<TruckLoadQuantityItemResponse>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TruckLoadQuantityItemResponse {
     pub productid: Uuid,
     pub remaining_quantity: i32,
 }
+
 
 
 #[derive(Debug, Serialize, Deserialize)]

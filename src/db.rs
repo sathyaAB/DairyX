@@ -382,12 +382,12 @@ pub trait TruckLoadExt {
 
     async fn get_all_truck_loads(&self) -> Result<Vec<TruckLoad>, sqlx::Error>;
 
-    async fn update_remaining_quantity(
-        &self,
-        truckloadid: Uuid,
-        productid: Uuid,
-        delivered_quantity: i32,
-    ) -> Result<(Uuid, Uuid, i32), sqlx::Error>; 
+    async fn update_remaining_quantities(
+    &self,
+    truckloadid: Uuid,
+    items: Vec<(Uuid, i32)>,  // (productid, remaining_quantity)
+) -> Result<Vec<(Uuid, i32)>, sqlx::Error>;
+
 }
 
 #[async_trait]
@@ -465,15 +465,18 @@ impl TruckLoadExt for DBClient {
         Ok(truck_loads)
     }
 
-    async fn update_remaining_quantity(
-        &self,
-        truckloadid: Uuid,
-        productid: Uuid,
-        remaining_quantity: i32,
-    ) -> Result<(Uuid, Uuid, i32), sqlx::Error> { 
-        let mut tx: Transaction<'_, Postgres> = self.pool.begin().await?;
+    async fn update_remaining_quantities(
+    &self,
+    truckloadid: Uuid,
+    items: Vec<(Uuid, i32)>,
+) -> Result<Vec<(Uuid, i32)>, sqlx::Error> {
 
-        // 1. Decrease remaining_quantity in truck_load_products
+    let mut tx = self.pool.begin().await?;
+
+    let mut updated_items = Vec::new();
+
+    for (productid, remaining_quantity) in items {
+        // 1. Update truck_load_products
         let updated = sqlx::query!(
             r#"
             UPDATE truck_load_products
@@ -488,7 +491,7 @@ impl TruckLoadExt for DBClient {
         .fetch_one(&mut *tx)
         .await?;
 
-        // 2. Increase warehouse stock
+        // 2. Update warehouse stock
         sqlx::query!(
             r#"
             UPDATE warehouse_stock
@@ -501,11 +504,14 @@ impl TruckLoadExt for DBClient {
         .execute(&mut *tx)
         .await?;
 
-        // 3. Commit transaction
-        tx.commit().await?;
-
-        Ok((truckloadid, productid, updated.remaining_quantity))
+        updated_items.push((productid, updated.remaining_quantity));
     }
+
+    tx.commit().await?;
+
+    Ok(updated_items)
+}
+
 
 }
 

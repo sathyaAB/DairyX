@@ -4,7 +4,7 @@ use axum::{
     Json,
 };
 use std::sync::Arc;
-use crate::dtos::{CreateTruckLoadRequest, CreateTruckLoadResponse,UpdateTruckLoadQuantityResponse, UpdateTruckLoadQuantityRequest};
+use crate::dtos::{CreateTruckLoadRequest, CreateTruckLoadResponse,UpdateTruckLoadQuantityResponse, UpdateTruckLoadQuantityRequest, TruckLoadQuantityItemResponse};
 use crate::error::{HttpError, ErrorMessage};
 use crate::db::{ TruckLoadExt};
 use crate::models::UserRole;
@@ -26,8 +26,8 @@ pub async fn create_truck_load(
     Extension(app_state): Extension<Arc<AppState>>,
     Json(body): Json<CreateTruckLoadRequest>,
 ) -> Result<Json<CreateTruckLoadResponse>, HttpError> {
-    // Only Manager or Admin can create truck loads
-    if jwt_auth.user.role != UserRole::Manager && jwt_auth.user.role != UserRole::Admin {
+    // Only Manager can create truck loads
+    if jwt_auth.user.role != UserRole::Manager{
         return Err(HttpError::new(
             ErrorMessage::PermissionDenied.to_string(),
             StatusCode::FORBIDDEN,
@@ -96,31 +96,41 @@ pub async fn update_remaining_quantity(
     Extension(app_state): Extension<Arc<AppState>>,
     Json(body): Json<UpdateTruckLoadQuantityRequest>,
 ) -> Result<Json<UpdateTruckLoadQuantityResponse>, HttpError> {
-    // Only Admin or Manager can update
-    if jwt_auth.user.role != UserRole::Manager && jwt_auth.user.role != UserRole::Admin {
+
+    // Only manager
+    if jwt_auth.user.role != UserRole::Manager {
         return Err(HttpError::new(
             ErrorMessage::PermissionDenied.to_string(),
             StatusCode::FORBIDDEN,
         ));
     }
 
-    // Update remaining quantity and warehouse stock
-    let result = app_state.db_client
-        .update_remaining_quantity(
-            body.truckloadid,
-            body.productid,
-            body.remaining_quantity
-        )
+    // Convert DTO items → simple tuple for DB layer
+    let list = body
+        .items
+        .iter()
+        .map(|item| (item.productid, item.remaining_quantity))
+        .collect::<Vec<_>>();
+
+    let result = app_state
+        .db_client
+        .update_remaining_quantities(body.truckloadid, list)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
-    // Map result to response DTO
+    // Build response DTO
     let response = UpdateTruckLoadQuantityResponse {
-        truckloadid: result.0,
-        productid: result.1,
-        remaining_quantity: result.2,
+        truckloadid: body.truckloadid,
+        items: result
+            .into_iter()
+            .map(|(productid, qty)| TruckLoadQuantityItemResponse {
+                productid,
+                remaining_quantity: qty,
+            })
+            .collect(),
     };
 
     Ok(Json(response))
 }
+
 
