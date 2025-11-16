@@ -93,7 +93,7 @@ pub async fn login(
     // Generate JWT token
     let secret_key = app_state.env.jwt_secret.as_bytes();
 
-    let token = token::create_token(&user.id.to_string(), &user.role.to_str(),secret_key,3600)
+    let token = token::create_token(&user.id.to_string(), &user.role.to_str(),secret_key,21600)
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
     println!("User '{}' logged in successfully", user.email);

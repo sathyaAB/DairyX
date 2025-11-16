@@ -19,8 +19,6 @@ pub fn delivery_handler() -> Router {
         .route("/create", post(create_delivery))
         .route("/history", get(get_delivery_history))
         .route("/all", get(get_all_delivery_history))
-
-
 }
 
 pub async fn create_delivery(

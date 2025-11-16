@@ -466,54 +466,71 @@ impl TruckLoadExt for DBClient {
         .await?;
         Ok(truck_loads)
     }
-
     async fn update_remaining_quantities(
-    &self,
-    truckloadid: Uuid,
-    items: Vec<(Uuid, i32)>,
-) -> Result<Vec<(Uuid, i32)>, sqlx::Error> {
+        &self,
+        truckloadid: Uuid,
+        items: Vec<(Uuid, i32)>,
+    ) -> Result<Vec<(Uuid, i32)>, sqlx::Error> {
 
-    let mut tx = self.pool.begin().await?;
+        let mut tx = self.pool.begin().await?;
+        let mut updated_items = Vec::new();
 
-    let mut updated_items = Vec::new();
+        for (productid, add_quantity) in items {
+            // 0. Fetch the current loaded quantity
+            let loaded: (i32,) = sqlx::query_as(
+                r#"
+                SELECT quantity
+                FROM truck_load_products
+                WHERE truckloadid = $1 AND productid = $2
+                "#
+            )
+            .bind(truckloadid)
+            .bind(productid)
+            .fetch_one(&mut *tx)
+            .await?;
 
-    for (productid, remaining_quantity) in items {
-        // 1. Update truck_load_products
-        let updated = sqlx::query!(
-            r#"
-            UPDATE truck_load_products
-            SET remaining_quantity = remaining_quantity + $1
-            WHERE truckloadid = $2 AND productid = $3
-            RETURNING remaining_quantity
-            "#,
-            remaining_quantity,
-            truckloadid,
-            productid
-        )
-        .fetch_one(&mut *tx)
-        .await?;
+            // Check if adding would exceed loaded quantity
+            if add_quantity > loaded.0 {
+                return Err(sqlx::Error::Protocol(format!(
+                    "Remaining quantity {} exceeds loaded quantity {} for product {}",
+                    add_quantity, loaded.0, productid
+                ).into()));
+            }
 
-        // 2. Update warehouse stock
-        sqlx::query!(
-            r#"
-            UPDATE warehouse_stock
-            SET quantity = quantity + $1
-            WHERE productid = $2
-            "#,
-            remaining_quantity,
-            productid
-        )
-        .execute(&mut *tx)
-        .await?;
+            // 1. Update truck_load_products
+            let updated = sqlx::query!(
+                r#"
+                UPDATE truck_load_products
+                SET remaining_quantity = remaining_quantity + $1
+                WHERE truckloadid = $2 AND productid = $3
+                RETURNING remaining_quantity
+                "#,
+                add_quantity,
+                truckloadid,
+                productid
+            )
+            .fetch_one(&mut *tx)
+            .await?;
 
-        updated_items.push((productid, updated.remaining_quantity));
-    }
+            // 2. Update warehouse stock
+            sqlx::query!(
+                r#"
+                UPDATE warehouse_stock
+                SET quantity = quantity + $1
+                WHERE productid = $2
+                "#,
+                add_quantity,
+                productid
+            )
+            .execute(&mut *tx)
+            .await?;
 
-    tx.commit().await?;
+            updated_items.push((productid, updated.remaining_quantity));
+        }
 
-    Ok(updated_items)
+        tx.commit().await?;
+        Ok(updated_items)
 }
-
 
 }
 
